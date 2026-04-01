@@ -1,2 +1,3 @@
 ./QFT
 ./legacy
+./__pycache__
