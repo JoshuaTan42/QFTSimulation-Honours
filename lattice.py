@@ -1,13 +1,9 @@
 class LatticeGrid:
     def __init__(self,
                  width:int,
-                 height:int,
-                 spacing:float,
-                 boundary_condition:str = "Casimir"):
+                 height:int):
         self.width = width
         self.height = height
-        self.spacing = spacing
-        self.boundary_condition = boundary_condition
 
         self.n_sites = self.width * self.height
 
@@ -122,17 +118,15 @@ class LatticeGrid:
                 print(pipe_line)
             else:
                 # Bottom plate markers
-                print("▔▔▔▔▔▔▔" * self.width)
+                print("▔▔▔▔▔▔▔▔▔▔▔▔" * self.width)
 
 
     def debug(self):
         print("Printing Statistics:")
-        print("=+"*15)
-        print(f"Qubit Count        | {self.n_qubits}\n" +
-              f"Lattice Width      | {self.width}\n" +
-              f"Lattice Height     | {self.height}\n" +
-              f"Lattice Spacing    | {self.spacing}\n" +
-              f"Boundary Condition | {self.boundary_condition}\n\n" +
+        print("+="*18)
+        print(f"Qubit Count           | {self.n_qubits}\n" +
+              f"Lattice Width         | {self.width}\n" +
+              f"Lattice Height        | {self.height}\n" +
 
               f"Lattice Sites         | {self.n_sites}\n" +
               f"Lattice X_Links       | {self.n_horizontal_links}\n" +
