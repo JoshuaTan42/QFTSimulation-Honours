@@ -1,10 +1,10 @@
 from qiskit import QuantumCircuit, transpile
-from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.circuit.library import PauliEvolutionGate, StatePreparation
 from qiskit.synthesis import SuzukiTrotter
 from QuantumFields.gauge_field import QuantumLinkModel, GaussLaw
 import numpy as np
 from qiskit.quantum_info import SparsePauliOp, Statevector
-
+from qiskit_ibm_runtime import EstimatorV2 as Estimator
 
 
 class TrotterEvolution:
@@ -92,6 +92,87 @@ class DynamicalSimulation:
             'e_field_profiles': np.array(e_profiles)
         }
 
+    def run_on_backend(self, backend, shots=4096, time_points=None):
+        estimator = Estimator(mode=backend)
+        estimator.options.resilience_level = 1
+        estimator.options.default_shots = shots
+
+        observables = []
+        for q in range(self.n_qubits):
+            label = ['I'] * self.n_qubits
+            label[q] = 'Z'
+            observables.append(SparsePauliOp([''.join(label)], coeffs=[0.5]))
+
+        results = {}
+
+        if time_points is None:
+            time_points = [0, 50, 100, 200, self.n_steps]
+
+        # Build one Trotter step
+        single_step = TrotterEvolution(
+            self.hamiltonian, self.n_qubits,
+            total_time=self.dt, n_steps=1
+        )
+        step_circuit = single_step.build_circuit()
+        step_circuit = transpile(step_circuit,
+            basis_gates=['cx','rz','ry','rx','h','x','y','z','s','sdg'],
+            optimization_level=3)
+
+        results = {}
+
+        for n_step in time_points:
+            # Build circuit: init → n Trotter steps (no measurement needed)
+            qc = QuantumCircuit(self.n_qubits)
+
+            if self.initial_state is not None:
+                qc.append(StatePreparation(self.initial_state),
+                        range(self.n_qubits))
+
+            for _ in range(n_step):
+                qc.compose(step_circuit, qubits=range(self.n_qubits),
+                        inplace=True)
+
+            # Transpile for the backend
+            isa_circuit = transpile(qc, backend, optimization_level=2)
+
+            # Map observables to the circuit layout
+            mapped_obs = [
+                obs.apply_layout(isa_circuit.layout) for obs in observables
+            ]
+
+            # Submit: one circuit, all observables
+            job = estimator.run([(isa_circuit, mapped_obs)])
+            result = job.result()
+
+            # Extract expectation values
+            e_field = [val.item() for val in result[0].data.evs]
+
+            t = n_step * self.dt
+            two_qubit_gates = isa_circuit.count_ops().get('cx', 0) + isa_circuit.count_ops().get('ecr', 0)
+
+            results[t] = {
+                'e_field': e_field,
+                'depth': isa_circuit.depth(),
+                'two_qubit_gates': two_qubit_gates,
+            }
+
+            print(f"t={t:.2f}  depth={results[t]['depth']}  "
+                f"Gate counts: {dict(isa_circuit.count_ops())}  "
+                f"E_field={[f'{v:.4f}' for v in e_field]}")
+
+        return results
+
+    def _e_field_from_counts(self, counts):
+        shots = sum(counts.values())
+        e_field = [0.0] * self.n_qubits
+
+        for bitstring, count in counts.items():
+            for q in range(self.n_qubits):
+                bit = int(bitstring[-(q + 1)])
+                e_field[q] += (1 - 2 * bit) * count
+
+        return [val / (2 * shots) for val in e_field]
+
     def _max_gauss_violation(self, sv: Statevector) -> float:
         sv_arr = np.array(sv)
         max_viol = 0.0
@@ -114,4 +195,3 @@ class DynamicalSimulation:
 
     def _plaquette_expectation(self, sv: Statevector) -> float:
         return sv.expectation_value(self._H_B).real
-    
