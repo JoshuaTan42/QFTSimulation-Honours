@@ -4,6 +4,13 @@ from circuit import DynamicalSimulation
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.linalg import eigh
+from scipy.sparse.linalg import eigsh
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+from qiskit_aer import AerSimulator
+
+QiskitRuntimeService.save_account(
+    token="", overwrite=True
+)
 
 lattice = LatticeGrid(width=3, height=3)
 gauss = GaussLaw(lattice)
@@ -18,7 +25,8 @@ print("\n=== Finding gauge-invariant ground state (g²=1.0) ===")
 qlm_strong = QuantumLinkModel(lattice, coupling=0.01, gauss_penalty=20.0)
 H_strong = qlm_strong.build_hamiltonian()
 
-eigenvalues, eigenvectors = eigh(H_strong.to_matrix())
+H_sparse = H_strong.to_matrix(sparse=True)  # scipy sparse matrix, not dense
+eigenvalues, eigenvectors = eigsh(H_sparse, k=2, which='SA')
 gs_vector = eigenvectors[:, 0]
 
 print(f"Ground state energy: {eigenvalues[0]:.6f}")
@@ -54,42 +62,49 @@ sim = DynamicalSimulation(
     H_evolve, lattice,
     coupling=evolution_coupling,
     gauss_penalty=0.0,
-    total_time=20.0,
-    n_steps=400,
+    total_time=40.0,
+    n_steps=800,
     initial_state=gs_vector  # <-- THIS IS THE KEY LINE
 )
-results = sim.run()
+#results = sim.run()
+
+
+backend = AerSimulator(method='statevector')
+hw_results = sim.run_on_backend(backend, shots=4096,
+                             time_points=[0, 50, 100, 200, 400])
+
+"""service = QiskitRuntimeService()
+backend = service.least_busy(operational=True)
+print(f"Running on: {backend.name}")
+
+hw_results = sim.run_on_backend(backend, shots=4096,
+                             time_points=[0, 50, 100, 200, 400])"""
 
 # ============================================================
 # Plots
 # ============================================================
 
-fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
+# Plot hardware results
+times = sorted(hw_results.keys())
+e_fields = [hw_results[t]['e_field'] for t in times]
+depths = [hw_results[t]['depth'] for t in times]
 
-axes[0].plot(results['times'], results['energies'], 'b-')
-axes[0].set_ylabel('⟨H⟩')
-axes[0].set_title('Quantum quench: g²=1.0 → g²=0.1 (2×3 lattice)')
+fig, axes = plt.subplots(2, 1, figsize=(10, 8))
 
-axes[1].plot(results['times'], results['gauss_violations'], 'r-')
-axes[1].set_ylabel('Max Gauss violation')
-axes[1].set_yscale('log')
+# Electric field heatmap
+e_data = np.array(e_fields)
+im = axes[0].imshow(e_data.T, aspect='auto', cmap='RdBu_r',
+                     extent=[times[0], times[-1], -0.5, lattice.n_qubits - 0.5],
+                     origin='lower')
+axes[0].set_ylabel('Link index')
+axes[0].set_title('Electric field (Aer, 4096 shots)')
+plt.colorbar(im, ax=axes[0], label='⟨Z/2⟩')
 
-axes[2].plot(results['times'], results['plaquette_values'], 'g-')
-axes[2].set_ylabel('⟨H_B⟩')
-axes[2].set_xlabel('Time t')
+# Circuit depth at each time point
+axes[1].plot(times, depths, 'o-', color='coral')
+axes[1].set_xlabel('Time t')
+axes[1].set_ylabel('Circuit depth')
+axes[1].set_title('Circuit depth vs simulation time')
 
-plt.tight_layout()
-plt.show()
-
-e_data = np.array(results['e_field_profiles'])
-
-fig, ax = plt.subplots(figsize=(10, 5))
-im = ax.imshow(e_data.T, aspect='auto', cmap='RdBu_r',
-               extent=[0, results['times'][-1], -0.5, lattice.n_qubits - 0.5],
-               origin='lower')
-ax.set_xlabel('Time t')
-ax.set_ylabel('Link index')
-ax.set_title('Electric field profile ⟨E_ℓ(t)⟩')
-plt.colorbar(im, label='⟨Z/2⟩')
 plt.tight_layout()
 plt.show()
