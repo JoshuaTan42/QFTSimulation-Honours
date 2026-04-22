@@ -347,8 +347,8 @@ if __name__ == "__main__":
 
     lattice_4x4 = LatticeGrid(width=4, height=4)
     print(f"\n4x4 lattice: {lattice_4x4.n_qubits} qubits")
-    energy_hc, gs_mps_hc = get_ground_state_dmrg(lattice_4x4, coupling=1.0, max_bond=256)
-    energy_lc, gs_mps_lc = get_ground_state_dmrg(lattice_4x4, coupling=0.1, max_bond=256)
+    energy_hc, gs_mps_hc = get_ground_state_dmrg(lattice_4x4, coupling=1.0, max_bond=512)
+    energy_lc, gs_mps_lc = get_ground_state_dmrg(lattice_4x4, coupling=0.1, max_bond=512)
 
     print(f"Energy High Coupling: {energy_hc}")
     print(f"MPS bonds High Coupling: {gs_mps_hc.bond_sizes()}")
@@ -361,9 +361,9 @@ if __name__ == "__main__":
     for g2 in [1.0, 0.1]:
         print(f"\n--- g² = {g2} ---")
         energy_pen, _ = get_ground_state_dmrg(lattice_4x4, coupling=g2,
-                                            penalty=20.0, max_bond=256)
+                                            penalty=20.0, max_bond=512)
         energy_nopen, _ = get_ground_state_dmrg(lattice_4x4, coupling=g2,
-                                                penalty=0.0, max_bond=256)
+                                                penalty=0.0, max_bond=512)
         electric_shift = g2 / 8.0 * lattice_4x4.n_links_total
         print(f"  With penalty:       {energy_pen}")
         print(f"  Without penalty:    {energy_nopen}")
