@@ -1,9 +1,6 @@
 from qiskit.quantum_info import SparsePauliOp
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.circuit.library import StatePreparation
-from QuantumFields.fermionic_field import FermionicField
-
 
 class QuantumLinkModel:
     _PLAQ_PAULIS = [
@@ -18,20 +15,14 @@ class QuantumLinkModel:
     ]
 
     def __init__(self, lattice,
-                 kappa: float = 1.0,
-                 mass: float = 0.5,
                  g_squared: float = 1.0,
                  J: float = 1.0,
                  gauss_penalty: float = 0.0):
         self.lattice = lattice
-        self.kappa = kappa
-        self.mass = mass
         self.g_squared = g_squared
         self.J = J
         self.gauss_penalty = gauss_penalty
         self.n_qubits = lattice.n_qubits
-
-        self._fermion = FermionicField(lattice)
 
     def build_electric_term(self) -> SparsePauliOp:
         shift = self.g_squared / 8.0 * self.lattice.n_links_total
@@ -55,19 +46,7 @@ class QuantumLinkModel:
                 coefficients.append(sign * plaq_coeff)
 
         return SparsePauliOp(pauli_strings, coeffs=coefficients)
-
-    def build_hopping_term(self) -> SparsePauliOp:
-        if self.kappa == 0.0:
-            return SparsePauliOp(['I' * self.n_qubits], coeffs=[0.0])
-
-        return self._fermion.build_hopping_term(self.kappa)
-
-    def build_mass_term(self) -> SparsePauliOp:
-        if self.mass == 0.0:
-            return SparsePauliOp(['I' * self.n_qubits], coeffs=[0.0])
-
-        return self._fermion.build_mass_term(self.mass)
-
+    
     def build_gauss_penalty(self) -> SparsePauliOp:
         if self.gauss_penalty == 0.0:
             return SparsePauliOp(['I' * self.n_qubits], coeffs=[0.0])
@@ -89,17 +68,6 @@ class QuantumLinkModel:
         return H_penalty.simplify()
 
     def build_hamiltonian(self) -> SparsePauliOp:
-        H = self.build_electric_term()
-        H = H + self.build_magnetic_term()
-        H = H + self.build_hopping_term()
-        H = H + self.build_mass_term()
-
-        if self.gauss_penalty > 0:
-            H = H + self.build_gauss_penalty()
-
-        return H.simplify()
-
-    def build_hamiltonian_pure_gauge(self) -> SparsePauliOp:
         H = self.build_electric_term() + self.build_magnetic_term()
 
         if self.gauss_penalty > 0:
@@ -119,88 +87,58 @@ class GaussLaw:
         self.lattice = lattice
         self.n_qubits = lattice.n_qubits
         self.n_sites = lattice.n_sites
-        self._fermion = FermionicField(lattice)
 
     def build_gauss_operators(self) -> list:
         gauss_ops = []
 
         for site_idx in range(self.n_sites):
             i, j = self.lattice.site_to_coords(site_idx)
-
-            is_boundary = (j == 0 or j == self.lattice.height - 1)
-            if is_boundary:
+            
+            if j == 0 or j == self.lattice.height - 1:
                 gauss_ops.append(None)
                 continue
-
+            
             neighbours = self.lattice.get_neighbours(i, j)
             pauli_strings = []
             coefficients = []
 
-            # Right link: outgoing → +Z/2
             if "right" in neighbours:
                 link_idx = self.lattice.get_horizontal_link_index(i, j)
                 pauli_strings.append(self._pauli_z_on_qubit(link_idx))
                 coefficients.append(+0.5)
 
-            # Left link: incoming → -Z/2
             if "left" in neighbours:
                 i_left, j_left = neighbours["left"]
                 link_idx = self.lattice.get_horizontal_link_index(i_left, j_left)
                 pauli_strings.append(self._pauli_z_on_qubit(link_idx))
                 coefficients.append(-0.5)
 
-            # Up link: outgoing → +Z/2
             if "up" in neighbours:
                 link_idx = self.lattice.get_vertical_link_index(i, j)
                 pauli_strings.append(self._pauli_z_on_qubit(link_idx))
                 coefficients.append(+0.5)
 
-            # Down link: incoming → -Z/2
             if "down" in neighbours:
                 i_down, j_down = neighbours["down"]
                 link_idx = self.lattice.get_vertical_link_index(i, j_down)
                 pauli_strings.append(self._pauli_z_on_qubit(link_idx))
                 coefficients.append(-0.5)
 
-            # G = div(E) - n_s + vacuum_charge
-            # n_s = (I - Z_s)/2 (bare number operator)
-            # vacuum_charge = (1 - (-1)^{i+j}) / 2
-            matter_qubit = self.lattice.get_matter_qubit_by_site(site_idx)
-            label_i = 'I' * self.n_qubits
-            label_z = ['I'] * self.n_qubits
-            label_z[self.n_qubits - 1 - matter_qubit] = 'Z'
-            n_op = SparsePauliOp(
-                [label_i, ''.join(label_z)],
-                coeffs=[0.5, -0.5]
-            )
-
-            stagger = self.lattice.stagger_sign(i, j)
-            vacuum_charge = (1 - stagger) / 2.0
-
             if len(pauli_strings) > 0:
-                div_E = SparsePauliOp(pauli_strings, coeffs=coefficients)
-                G_site = (div_E - n_op + vacuum_charge * SparsePauliOp([label_i], coeffs=[1.0])).simplify()
+                G_site = SparsePauliOp(pauli_strings, coeffs=coefficients).simplify()
             else:
-                G_site = (-n_op + vacuum_charge * SparsePauliOp([label_i], coeffs=[1.0])).simplify()
+                label_i = 'I' * self.n_qubits
+                G_site = SparsePauliOp([label_i], coeffs=[0.0])
 
             gauss_ops.append(G_site)
 
         return gauss_ops
 
-    def get_initial_circuit(self, state_vector=None) -> QuantumCircuit:
+    def get_initial_circuit(self) -> QuantumCircuit:
         qc = QuantumCircuit(self.n_qubits)
 
-        if state_vector is not None:
-            qc.append(StatePreparation(state_vector), range(self.n_qubits))
-        else:
-            for site_idx in range(self.lattice.n_sites):
-                i, j = self.lattice.site_to_coords(site_idx)
-                qubit = self.lattice.get_matter_qubit(i, j)
-                if self.lattice.stagger_sign(i, j) == -1:
-                    qc.x(qubit)
-
-            for link_q in self.lattice.get_electric_qubits():
-                qc.h(link_q)
+        for link_q in self.lattice.get_electric_qubits():
+            qc.h(link_q)
 
         return qc
 
