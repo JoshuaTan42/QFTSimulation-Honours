@@ -2,9 +2,8 @@ from qiskit import QuantumCircuit, transpile
 from qiskit.circuit.library import PauliEvolutionGate, StatePreparation
 from qiskit.synthesis import SuzukiTrotter
 from QuantumFields.gauge_field import QuantumLinkModel, GaussLaw
-from QuantumFields.fermionic_field import FermionicField
 import numpy as np
-from qiskit.quantum_info import SparsePauliOp, Statevector
+from qiskit.quantum_info import SparsePauliOp
 from scipy.sparse.linalg import expm_multiply
 
 
@@ -27,63 +26,31 @@ class TrotterEvolution:
 
 
 class StructuredTrotter:
-    def __init__(self, lattice, kappa=1.0, mass=0.5, g_squared=1.0, J=1.0, dt=0.05):
+    def __init__(self, lattice, g_squared=1.0, J=1.0, dt=0.05):
         self.lattice = lattice
         self.n_qubits = lattice.n_qubits
-        self.kappa = kappa
-        self.mass = mass
         self.g_squared = g_squared
         self.J = J
         self.dt = dt
 
-        self.hop_sublayers = lattice.get_hopping_sublayers()
         self.plaq_sublayers = lattice.get_plaquette_sublayers()
         self.electric_qubits = lattice.get_electric_qubits()
-        self.mass_qubits = lattice.get_mass_qubits()
 
     def build_step(self) -> QuantumCircuit:
         qc = QuantumCircuit(self.n_qubits)
 
-        self._apply_hopping_sublayer(qc, self.hop_sublayers[0])
+        self._apply_electric_layer(qc, fraction=0.5)
+        qc.barrier()
+
         self._apply_plaquette_sublayer(qc, self.plaq_sublayers[0])
-        self._apply_electric_layer(qc, fraction=0.25)
         qc.barrier()
 
-        self._apply_hopping_sublayer(qc, self.hop_sublayers[1])
         self._apply_plaquette_sublayer(qc, self.plaq_sublayers[1])
-        self._apply_electric_layer(qc, fraction=0.25)
         qc.barrier()
 
-        self._apply_hopping_sublayer(qc, self.hop_sublayers[2])
-        self._apply_electric_layer(qc, fraction=0.25)
-        qc.barrier()
-
-        self._apply_hopping_sublayer(qc, self.hop_sublayers[3])
-        self._apply_electric_layer(qc, fraction=0.25)
-        qc.barrier()
-
-        self._apply_mass_layer(qc)
+        self._apply_electric_layer(qc, fraction=0.5)
 
         return qc
-
-    def _apply_hopping_sublayer(self, qc, terms):
-        if self.kappa == 0.0:
-            return
-        for site_a, link, site_b, direction, stagger in terms:
-            angle = self.dt * self.kappa * stagger
-            self._hopping_gate(qc, site_a, link, site_b, angle)
-
-    def _hopping_gate(self, qc, site_a, link, site_b, angle):
-        pauli_terms = [
-            (['X', 'X', 'X'], +1.0),
-            (['X', 'Y', 'Y'], -1.0),
-            (['Y', 'X', 'Y'], +1.0),
-            (['Y', 'Y', 'X'], +1.0),
-        ]
-
-        qubits = [site_a, link, site_b]
-        for paulis, sign in pauli_terms:
-            self._exp_pauli_string(qc, sign * angle / 4.0, qubits, paulis)
 
     def _apply_plaquette_sublayer(self, qc, plaquettes):
         if self.J == 0.0:
@@ -103,13 +70,6 @@ class StructuredTrotter:
         angle = self.dt * self.g_squared * fraction / 4.0
         for link_q in self.electric_qubits:
             qc.rz(angle, link_q)
-
-    def _apply_mass_layer(self, qc):
-        if self.mass == 0.0:
-            return
-        for qubit, sign in self.mass_qubits:
-            angle = self.dt * self.mass * sign
-            qc.rz(angle, qubit)
 
     def _exp_pauli_string(self, qc, angle, qubits, paulis):
         for q, p in zip(qubits, paulis):
@@ -137,8 +97,7 @@ class StructuredTrotter:
 
 class DynamicalSimulation:
     def __init__(self, hamiltonian, lattice,
-                 kappa=1.0, mass=0.5, g_squared=1.0, J=1.0,
-                 gauss_penalty=0.0,
+                 g_squared=1.0, J=1.0,
                  total_time=20.0, n_steps=400,
                  initial_state=None,
                  use_structured_trotter=True):
@@ -152,12 +111,9 @@ class DynamicalSimulation:
         self.initial_state = initial_state
         self.use_structured_trotter = use_structured_trotter
 
-        self._kappa = kappa
-        self._mass = mass
         self._g_squared = g_squared
         self._J = J
 
-        # Cache sparse matrices — built once
         self._H_sparse = self.hamiltonian.to_matrix(sparse=True)
 
         gauss = GaussLaw(self.lattice)
@@ -169,12 +125,10 @@ class DynamicalSimulation:
                 self._gauss_sparse.append(G_op.to_matrix(sparse=True))
 
         H_B_op = QuantumLinkModel(
-            lattice, kappa=kappa, mass=mass,
-            g_squared=g_squared, J=J
+            lattice, g_squared=g_squared, J=J
         ).build_magnetic_term()
         self._H_B_sparse = H_B_op.to_matrix(sparse=True)
 
-        # Cache electric field operators
         self._efield_ops_sparse = []
         for link_q in self.lattice.get_electric_qubits():
             label = ['I'] * self.n_qubits
@@ -186,20 +140,15 @@ class DynamicalSimulation:
         if self.initial_state is not None:
             sv = self.initial_state.copy().astype(complex)
         else:
-            # Staggered vacuum: odd matter sites filled, gauge links in |+⟩
             sv = np.zeros(2**self.n_qubits, dtype=complex)
-            # This would need proper construction — for now require initial_state
-            raise ValueError("Must provide initial_state for sparse evolution")
+            sv[0] = 1.0
 
-        # Verify initial energy matches what main.py computed
         E0 = (np.conj(sv) @ self._H_sparse @ sv).real
         if verbose:
             print(f"Initial energy (verified): {E0:.6f}")
 
-        # Pre-compute the evolution operator factor: -i * dt * H
         minus_i_dt_H = -1j * self.dt * self._H_sparse
 
-        # Storage
         times = [0.0]
         energies = [E0]
         gauss_violations = [self._max_gauss_violation(sv)]
@@ -211,7 +160,6 @@ class DynamicalSimulation:
             print(f"{0.0:6.3f}  {energies[0]:12.6f}  "
                   f"{gauss_violations[0]:12.2e}  {plaquette_values[0]:10.6f}")
 
-        # Evolve step by step
         for step in range(1, self.n_steps + 1):
             sv = expm_multiply(minus_i_dt_H, sv)
             t = step * self.dt
@@ -254,11 +202,9 @@ class DynamicalSimulation:
         if time_points is None:
             time_points = [0, 50, 100, 200, self.n_steps]
 
-        # Build Trotter step circuit (for backend only)
         if self.use_structured_trotter:
             structured = StructuredTrotter(
                 self.lattice,
-                kappa=self._kappa, mass=self._mass,
                 g_squared=self._g_squared, J=self._J,
                 dt=self.dt
             )
@@ -325,10 +271,6 @@ class DynamicalSimulation:
 
         return results
 
-    # =================================================================
-    # Observable measurement (all sparse, no dense matrices)
-    # =================================================================
-
     def _max_gauss_violation(self, sv: np.ndarray) -> float:
         max_viol = 0.0
         for G_sparse in self._gauss_sparse:
@@ -343,15 +285,3 @@ class DynamicalSimulation:
 
     def _plaquette_expectation(self, sv: np.ndarray) -> float:
         return (np.conj(sv) @ self._H_B_sparse @ sv).real
-
-    def _matter_occupation(self, sv: np.ndarray) -> list:
-        occupation = []
-        for site_idx in range(self.lattice.n_sites):
-            qubit = self.lattice.get_matter_qubit_by_site(site_idx)
-            label = ['I'] * self.n_qubits
-            label[self.n_qubits - 1 - qubit] = 'Z'
-            op = SparsePauliOp([''.join(label)], coeffs=[-0.5])
-            op_sparse = op.to_matrix(sparse=True)
-            occ = 0.5 + (np.conj(sv) @ op_sparse @ sv).real
-            occupation.append(occ)
-        return occupation

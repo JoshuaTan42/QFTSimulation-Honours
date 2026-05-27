@@ -2,27 +2,16 @@ class LatticeGrid:
     def __init__(self,
                  width: int,
                  height: int,
-                 boundary: str = "open"):
+                 boundary: str = "closed"):
         self.width = width
         self.height = height
         self.boundary = boundary
-
         self.n_sites = self.width * self.height
-
         self.n_horizontal_links = self.n_sites
         self.n_vertical_links = self.width * (self.height - 1)
         self.n_links_total = self.n_horizontal_links + self.n_vertical_links
-
-
-        self.n_matter_qubits = self.n_sites
-        self.n_gauge_qubits = self.n_links_total
-        self.n_qubits = self.n_matter_qubits + self.n_gauge_qubits
-
-        self._gauge_offset = self.n_matter_qubits
-
-    # =================================================================
-    # Site / coordinate mapping (unchanged)
-    # =================================================================
+        self.n_qubits = self.n_links_total
+        self._gauge_offset = 0
 
     def site_to_coords(self, site_idx: int) -> tuple:
         if not (0 <= site_idx < self.n_sites):
@@ -37,28 +26,14 @@ class LatticeGrid:
             raise ValueError(f"j={j} out of bounds [0, {self.height})")
         return i + self.width * j
 
-    # =================================================================
-    # Qubit index mapping — matter sites
-    # =================================================================
-
-    def get_matter_qubit(self, i: int, j: int) -> int:
-        return self.coords_to_site(i, j)
-
-    def get_matter_qubit_by_site(self, site_idx: int) -> int:
-        return site_idx
-
-    # =================================================================
-    # Qubit index mapping — gauge links
-    # =================================================================
-
     def get_horizontal_link_index(self, i: int, j: int) -> int:
         i = i % self.width
-        return self._gauge_offset + i + self.width * j
+        return i + self.width * j
 
     def get_vertical_link_index(self, i: int, j: int) -> int:
         if j >= self.height - 1:
             raise ValueError(f"No vertical link at j={j}")
-        return self._gauge_offset + self.n_horizontal_links + i + self.width * j
+        return self.n_horizontal_links + i + self.width * j
 
     def get_link_qubit(self, i: int, j: int, direction: str) -> int:
         if direction == 'x':
@@ -67,25 +42,6 @@ class LatticeGrid:
             return self.get_vertical_link_index(i, j)
         else:
             raise ValueError(f"Direction must be 'x' or 'y', got '{direction}'")
-
-    # =================================================================
-    # Staggering signs
-    # =================================================================
-
-    def stagger_sign(self, i: int, j: int) -> int:
-        return (-1) ** (i + j)
-
-    def hopping_sign(self, i: int, j: int, direction: str) -> int:
-        if direction == 'x':
-            return 1
-        elif direction == 'y':
-            return (-1) ** i
-        else:
-            raise ValueError(f"Direction must be 'x' or 'y', got '{direction}'")
-
-    # =================================================================
-    # Neighbour and link structure
-    # =================================================================
 
     def get_neighbours(self, i: int, j: int) -> dict:
         neighbours = {}
@@ -108,83 +64,20 @@ class LatticeGrid:
                 plaquettes.append((link_bottom, link_right, link_top, link_left))
         return plaquettes
 
-    def get_hopping_terms(self) -> list:
-        terms = []
-
-        for j in range(self.height):
-            for i in range(self.width):
-                # Horizontal: (i,j) → (i+1,j)
-                ni = (i + 1) % self.width
-                site_a = self.get_matter_qubit(i, j)
-                site_b = self.get_matter_qubit(ni, j)
-                link = self.get_horizontal_link_index(i, j)
-                stagger = self.hopping_sign(i, j, 'x')
-                terms.append((site_a, link, site_b, 'x', stagger))
-
-                # Vertical: (i,j) → (i,j+1)
-                if j < self.height - 1:
-                    site_a = self.get_matter_qubit(i, j)
-                    site_b = self.get_matter_qubit(i, j + 1)
-                    link = self.get_vertical_link_index(i, j)
-                    stagger = self.hopping_sign(i, j, 'y')
-                    terms.append((site_a, link, site_b, 'y', stagger))
-
-        return terms
-
-    # =================================================================
-    # Checkerboard grouping for structured Trotter
-    # =================================================================
-
-    def get_hopping_sublayers(self) -> list:
-        sublayers = [[], [], [], []]
-
-        for j in range(self.height):
-            for i in range(self.width):
-                ni = (i + 1) % self.width
-                site_a = self.get_matter_qubit(i, j)
-                site_b = self.get_matter_qubit(ni, j)
-                link = self.get_horizontal_link_index(i, j)
-                stagger = self.hopping_sign(i, j, 'x')
-
-                parity = (i + j) % 2
-                sublayers[parity].append((site_a, link, site_b, 'x', stagger))
-
-                if j < self.height - 1:
-                    site_a = self.get_matter_qubit(i, j)
-                    site_b = self.get_matter_qubit(i, j + 1)
-                    link = self.get_vertical_link_index(i, j)
-                    stagger = self.hopping_sign(i, j, 'y')
-
-                    sublayers[2 + parity].append((site_a, link, site_b, 'y', stagger))
-
-        return sublayers
-
     def get_plaquette_sublayers(self) -> list:
         sublayers = [[], []]
-
         for j in range(self.height - 1):
             for i in range(self.width):
                 link_bottom = self.get_horizontal_link_index(i, j)
                 link_right = self.get_vertical_link_index((i + 1) % self.width, j)
                 link_top = self.get_horizontal_link_index(i, j + 1)
                 link_left = self.get_vertical_link_index(i, j)
-
                 colour = (i + j) % 2
                 sublayers[colour].append((link_bottom, link_right, link_top, link_left))
-
         return sublayers
 
     def get_electric_qubits(self) -> list:
-        return list(range(self._gauge_offset, self.n_qubits))
-
-    def get_mass_qubits(self) -> list:
-        mass_terms = []
-        for site_idx in range(self.n_sites):
-            i, j = self.site_to_coords(site_idx)
-            qubit = self.get_matter_qubit(i, j)
-            sign = self.stagger_sign(i, j)
-            mass_terms.append((qubit, sign))
-        return mass_terms
+        return list(range(self.n_qubits))
 
     # =================================================================
     # Visualization
@@ -192,14 +85,12 @@ class LatticeGrid:
 
     def visualize_ascii(self):
         """Print ASCII art with both site and link qubit indices."""
-        #print("_" * (self.width * 14))
+        print("_" * (self.width * 14))
         print("\n\n")
 
         for j in range(self.height - 1, -1, -1):
             line = ""
             for i in range(self.width):
-                site_q = self.get_matter_qubit(i, j)
-                line += f"[s{site_q:d}]"
                 if i < self.width - 1:
                     h_link = self.get_horizontal_link_index(i, j)
                     line += f"─g{h_link:d}─"
@@ -219,15 +110,13 @@ class LatticeGrid:
                 print(vline)
                 print(f"  |{'         |' * (self.width - 1)}")
             else:
-                #print("▔" * (self.width * 14))
+                print("▔" * (self.width * 14))
                 pass
 
     def debug(self):
         print("Printing Statistics:")
         print("+=" * 20)
         print(f"Total Qubits          | {self.n_qubits}")
-        print(f"  Matter qubits       | {self.n_matter_qubits} (indices 0-{self.n_matter_qubits - 1})")
-        print(f"  Gauge qubits        | {self.n_gauge_qubits} (indices {self._gauge_offset}-{self.n_qubits - 1})")
         print(f"Lattice Width         | {self.width}")
         print(f"Lattice Height        | {self.height}")
         print(f"Lattice Sites         | {self.n_sites}")
@@ -236,17 +125,3 @@ class LatticeGrid:
         print(f"Lattice Total Links   | {self.n_links_total}")
         print(f"Boundary              | {self.boundary}")
         print()
-
-        # Qubit register layout
-        print("Qubit register layout:")
-        print(f"  [0..{self.n_matter_qubits-1}] = matter sites")
-        print(f"  [{self._gauge_offset}..{self.n_qubits-1}] = gauge links")
-        print()
-
-        # Hopping terms
-        hops = self.get_hopping_terms()
-        print(f"Hopping terms: {len(hops)}")
-        for site_a, link, site_b, d, s in hops[:4]:
-            print(f"  s{site_a} ─g{link}─ s{site_b}  dir={d} stagger={s:+d}")
-        if len(hops) > 4:
-            print(f"  ... ({len(hops) - 4} more)")
