@@ -41,10 +41,10 @@ class StructuredTrotter:
     two-qubit gate depth independent of lattice size.
     """
 
-    def __init__(self, lattice, g_squared=1.0, J=1.0, dt=0.05):
+    def __init__(self, lattice, g=1.0, J=1.0, dt=0.05):
         self.lattice = lattice
         self.n_qubits = lattice.n_qubits
-        self.g_squared = g_squared
+        self.g = g
         self.J = J
         self.dt = dt
 
@@ -52,18 +52,19 @@ class StructuredTrotter:
         self.electric_qubits = lattice.get_electric_qubits()
 
     def build_step(self) -> QuantumCircuit:
+        """First-order structured step (Joshi et al. 2026, Eq. 2; pure gauge):
+        e^{-i H_E dt} as a local-Rz layer, then e^{-i H_B dt} as the two
+        checkerboard plaquette sublayers (plaquettes commute within a sublayer).
+        """
         qc = QuantumCircuit(self.n_qubits)
 
-        self._apply_electric_layer(qc, fraction=0.5)
+        self._apply_electric_layer(qc)
         qc.barrier()
 
         self._apply_plaquette_sublayer(qc, self.plaq_sublayers[0])
         qc.barrier()
 
         self._apply_plaquette_sublayer(qc, self.plaq_sublayers[1])
-        qc.barrier()
-
-        self._apply_electric_layer(qc, fraction=0.5)
 
         return qc
 
@@ -76,8 +77,11 @@ class StructuredTrotter:
                                        list(qubits), list(pauli_str))
 
     def _apply_electric_layer(self, qc, fraction=1.0):
-        """Parallel single-qubit Rz rotations realising exp(-i dt H_E * fraction)."""
-        angle = self.dt * self.g_squared * fraction / 4.0
+        """Local Rz layer realising exp(-i dt H_E) with H_E = -(g/2) sum Z.
+
+        Rz(theta) = exp(-i theta Z/2), so exp(-i dt (-(g/2) Z)) = Rz(-g dt).
+        """
+        angle = -self.g * self.dt * fraction
         for link_q in self.electric_qubits:
             qc.rz(angle, link_q)
 
@@ -113,7 +117,7 @@ class DynamicalSimulation:
     """
 
     def __init__(self, hamiltonian, lattice,
-                 g_squared=1.0, J=1.0,
+                 g=1.0, J=1.0,
                  total_time=20.0, n_steps=400,
                  initial_state=None,
                  use_structured_trotter=True):
@@ -127,7 +131,7 @@ class DynamicalSimulation:
         self.initial_state = initial_state
         self.use_structured_trotter = use_structured_trotter
 
-        self._g_squared = g_squared
+        self._g = g
         self._J = J
 
         self._H_sparse = self.hamiltonian.to_matrix(sparse=True)
@@ -141,7 +145,7 @@ class DynamicalSimulation:
                 self._gauss_sparse.append(G_op.to_matrix(sparse=True))
 
         H_B_op = QuantumLinkModel(
-            lattice, g_squared=g_squared, J=J
+            lattice, g=g, J=J
         ).build_magnetic_term()
         self._H_B_sparse = H_B_op.to_matrix(sparse=True)
 
@@ -221,7 +225,7 @@ class DynamicalSimulation:
         if self.use_structured_trotter:
             structured = StructuredTrotter(
                 self.lattice,
-                g_squared=self._g_squared, J=self._J,
+                g=self._g, J=self._J,
                 dt=self.dt
             )
             step_circuit = structured.build_step()
