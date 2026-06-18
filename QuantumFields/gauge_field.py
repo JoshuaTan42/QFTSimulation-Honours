@@ -1,8 +1,18 @@
 """Pure-gauge U(1) quantum link model: Hamiltonian and Gauss's law.
 
+Hamiltonian (pure gauge, following Joshi et al. 2026, Eq. 1 with no matter):
+
+    H = -g sum_{links} S^z_l  +  J sum_plaquettes (U_p + U_p^dagger)
+        \\______ H_E ______/     \\__________ H_B __________/
+
+H_E is a *linear* electric-field term of strength g (string tension). The usual
+quadratic energy (g^2/2) sum (S^z)^2 is constant under the spin-1/2 truncation
+((S^z)^2 = 1/4), so the linear term is what gives the gauge field dynamics.
+
 Encoding (spin-1/2 truncation):
     electric field      S^z = (1/2) Z
     gauge connection    S^+ = (X + iY)/2,  S^- = (X - iY)/2
+    plaquette           U_p = S^+_b S^+_r S^-_t S^-_l  (bottom, right, top, left)
 
 Pauli labels are built with the index transform q -> N_q - 1 - q so that
 qubit q lands in the correct position under Qiskit's little-endian ordering.
@@ -27,23 +37,27 @@ class QuantumLinkModel:
         ("YYYY", +1.0),
     ]
 
-    def __init__(self, lattice, g_squared: float = 1.0, J: float = 1.0,
+    def __init__(self, lattice, g: float = 1.0, J: float = 1.0,
                  gauss_penalty: float = 0.0):
         self.lattice = lattice
-        self.g_squared = g_squared
-        self.J = J
+        self.g = g                      # linear electric-field strength
+        self.J = J                      # plaquette coupling
         self.gauss_penalty = gauss_penalty
         self.n_qubits = lattice.n_qubits
 
     def build_electric_term(self) -> SparsePauliOp:
-        """H_E = (g^2/2) sum (S^z)^2.
+        """Linear electric term H_E = -g sum_links S^z = -(g/2) sum_links Z.
 
-        Under the spin-1/2 truncation (S^z)^2 = (1/4) I, so this collapses to a
-        constant shift g^2/8 * N_links. (A linear S^z 'string-tension' term would
-        be added for non-trivial electric dynamics; not included in pure gauge.)
+        Following Joshi et al. (2026): the quadratic energy is constant under the
+        spin-1/2 truncation, so this linear field term (strength g) supplies the
+        string tension and unfreezes the electric dynamics.
         """
-        shift = self.g_squared / 8.0 * self.lattice.n_links_total
-        return SparsePauliOp(['I' * self.n_qubits], coeffs=[shift])
+        if self.g == 0.0:
+            return SparsePauliOp(['I' * self.n_qubits], coeffs=[0.0])
+        paulis = [self._pauli_string_on_qubits([q], 'Z')
+                  for q in self.lattice.get_electric_qubits()]
+        coeffs = [-self.g / 2.0] * len(paulis)
+        return SparsePauliOp(paulis, coeffs=coeffs)
 
     def build_magnetic_term(self) -> SparsePauliOp:
         """H_B = (J/8) sum_plaquettes (U_p + U_p^dagger), eight Paulis per plaquette."""

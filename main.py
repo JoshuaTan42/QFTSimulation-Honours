@@ -18,7 +18,7 @@ from circuit import DynamicalSimulation, StructuredTrotter, TrotterEvolution
 
 # --- Parameters -----------------------------------------------------------
 WIDTH, HEIGHT = 3, 3
-G_SQUARED = 6.0
+G = 6.0   # linear electric-field strength
 J_INITIAL = 2.0
 J_QUENCH = 0.5
 PENALTY = 200.0
@@ -35,7 +35,7 @@ BASIS_GATES = ['cx', 'rz', 'ry', 'rx', 'h', 'x', 'y', 'z', 's', 'sdg']
 def check_gauge_invariance(lattice):
     """||[G_j, H]|| should be ~0 for every interior site."""
     print("\n=== Gauge invariance check ===")
-    qlm = QuantumLinkModel(lattice, g_squared=G_SQUARED, J=J_INITIAL)
+    qlm = QuantumLinkModel(lattice, g=G, J=J_INITIAL)
     H = qlm.build_hamiltonian()
     for idx, G_op in enumerate(GaussLaw(lattice).build_gauss_operators()):
         if G_op is None:
@@ -49,9 +49,9 @@ def check_gauge_invariance(lattice):
 def compare_circuit_depth(lattice):
     """Structured (constant-depth) vs generic second-order Trotter step."""
     print("\n=== Circuit depth comparison ===")
-    H = QuantumLinkModel(lattice, g_squared=G_SQUARED, J=J_INITIAL).build_hamiltonian()
+    H = QuantumLinkModel(lattice, g=G, J=J_INITIAL).build_hamiltonian()
 
-    structured = StructuredTrotter(lattice, g_squared=G_SQUARED, J=J_INITIAL, dt=DT)
+    structured = StructuredTrotter(lattice, g=G, J=J_INITIAL, dt=DT)
     step_s = transpile(structured.build_step(), basis_gates=BASIS_GATES,
                        optimization_level=3)
     print(f"Structured: depth={step_s.depth()}, CNOTs={step_s.count_ops().get('cx', 0)}")
@@ -66,13 +66,13 @@ def compare_circuit_depth(lattice):
 def find_ground_state(lattice):
     """Lowest two eigenstates of the penalised Hamiltonian via sparse ED."""
     print("\n=== Finding gauge-invariant ground state ===")
-    qlm = QuantumLinkModel(lattice, g_squared=G_SQUARED, J=J_INITIAL,
+    qlm = QuantumLinkModel(lattice, g=G, J=J_INITIAL,
                            gauss_penalty=PENALTY)
     H_sparse = qlm.build_hamiltonian().to_matrix(sparse=True)
     eigenvalues, eigenvectors = eigsh(H_sparse, k=2, which='SA')
     gs_vector = eigenvectors[:, 0]
 
-    print(f"Initial parameters: g²={G_SQUARED}, J={J_INITIAL}")
+    print(f"Initial parameters: g={G}, J={J_INITIAL}")
     print(f"Ground state energy: {eigenvalues[0]:.6f}")
     print(f"First excited:       {eigenvalues[1]:.6f}")
     print(f"Gap:                 {eigenvalues[1] - eigenvalues[0]:.6f}")
@@ -83,17 +83,17 @@ def find_ground_state(lattice):
 def run_quench(lattice, gs_vector):
     """Quench J: J_INITIAL -> J_QUENCH and evolve the ground state."""
     print(f"\n=== Quench dynamics (J: {J_INITIAL} → {J_QUENCH}) ===")
-    H_evolve = QuantumLinkModel(lattice, g_squared=G_SQUARED, J=J_QUENCH,
+    H_evolve = QuantumLinkModel(lattice, g=G, J=J_QUENCH,
                                 gauss_penalty=PENALTY).build_hamiltonian()
 
     initial_energy = np.conj(gs_vector) @ H_evolve.to_matrix(sparse=True) @ gs_vector
-    print(f"Quench parameters: g²={G_SQUARED}, J={J_QUENCH}")
+    print(f"Quench parameters: g={G}, J={J_QUENCH}")
     print(f"Terms in H_evolve: {len(H_evolve)}")
     print(f"Initial energy in quenched H: {initial_energy.real:.6f}")
 
     sim = DynamicalSimulation(
         H_evolve, lattice,
-        g_squared=G_SQUARED, J=J_QUENCH,
+        g=G, J=J_QUENCH,
         total_time=TOTAL_TIME, n_steps=N_STEPS,
         initial_state=gs_vector,
         use_structured_trotter=True,
@@ -193,8 +193,8 @@ def print_summary(lattice, eigenvalues, step_s, step_g, results, results_aer,
     print("=" * 60)
     print(f"Lattice size:          {lattice.width}×{lattice.height} "
           f"({lattice.n_qubits} gauge qubits)")
-    print(f"Initial H:             g²={G_SQUARED}, J={J_INITIAL}")
-    print(f"Quench H:              g²={G_SQUARED}, J={J_QUENCH}")
+    print(f"Initial H:             g={G}, J={J_INITIAL}")
+    print(f"Quench H:              g={G}, J={J_QUENCH}")
     print(f"Ground state energy:   {eigenvalues[0]:.6f}")
     print(f"Gap:                   {eigenvalues[1] - eigenvalues[0]:.6f}")
     print("\nCircuit comparison:")

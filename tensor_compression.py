@@ -20,8 +20,8 @@ from QuantumFields.gauge_field import QuantumLinkModel, GaussLaw
 # Exact diagonalisation + MPS compression
 # =============================================================================
 
-def get_ground_state(lattice, g_squared, penalty=20.0):
-    qlm = QuantumLinkModel(lattice, g_squared=g_squared, gauss_penalty=penalty)
+def get_ground_state(lattice, g, penalty=20.0):
+    qlm = QuantumLinkModel(lattice, g=g, gauss_penalty=penalty)
     H_sparse = qlm.build_hamiltonian().to_matrix(sparse=True)
 
     # Lowest 2 eigenvalues only — far cheaper in memory than dense eigh.
@@ -53,8 +53,8 @@ def compress_and_measure(state_vector, n_qubits, chi_values):
 def run_coupling_scan(lattice, couplings, chi_values):
     results = []
     for g2 in couplings:
-        print(f"\n--- g² = {g2} ---")
-        energy, gs, is_valid = get_ground_state(lattice, g_squared=g2)
+        print(f"\n--- g = {g2} ---")
+        energy, gs, is_valid = get_ground_state(lattice, g=g2)
         print(f"Energy: {energy:.6f}  Gauss: {'✓' if is_valid else '✗'}")
 
         exact_bonds, errors = compress_and_measure(gs, lattice.n_qubits, chi_values)
@@ -73,12 +73,12 @@ def run_coupling_scan(lattice, couplings, chi_values):
     return results
 
 
-def run_lattice_scan(lattice_sizes, g_squared, chi_values):
+def run_lattice_scan(lattice_sizes, g, chi_values):
     results = []
     for W, H_lat in lattice_sizes:
         lattice = LatticeGrid(width=W, height=H_lat)
         print(f"\n--- {W}x{H_lat} lattice ({lattice.n_qubits} qubits) ---")
-        energy, gs, is_valid = get_ground_state(lattice, g_squared=g_squared)
+        energy, gs, is_valid = get_ground_state(lattice, g=g)
         print(f"  Energy: {energy:.6f}  Gauss: {'✓' if is_valid else '✗'}")
 
         exact_bonds, errors = compress_and_measure(gs, lattice.n_qubits, chi_values)
@@ -144,14 +144,14 @@ def pauli_op_to_mpo(pauli_op, n_qubits):
     return qtn.MatrixProductOperator(site_arrays, shape='lrud')
 
 
-def get_ground_state_dmrg(lattice, g_squared, penalty=20.0, max_bond=256):
+def get_ground_state_dmrg(lattice, g, penalty=20.0, max_bond=256):
     """DMRG ground state, warm-started from weak coupling and ramped up."""
     n = lattice.n_qubits
 
     # Stage 1: solve at weak coupling, where DMRG converges easily.
     start_coupling = 0.05
-    print(f"  Stage 1: ground state at g²={start_coupling}")
-    H_start = QuantumLinkModel(lattice, g_squared=start_coupling,
+    print(f"  Stage 1: ground state at g={start_coupling}")
+    H_start = QuantumLinkModel(lattice, g=start_coupling,
                                gauss_penalty=penalty).build_hamiltonian()
     psi0 = qtn.MPS_rand_state(n, bond_dim=64, dtype=complex)
     dmrg = qtn.DMRG2(pauli_op_to_mpo(H_start, n), which='SA',
@@ -161,28 +161,28 @@ def get_ground_state_dmrg(lattice, g_squared, penalty=20.0, max_bond=256):
     print(f"    Energy: {dmrg.energy}")
 
     # Stage 2: ramp through intermediate couplings to the target.
-    ramp_couplings = np.linspace(start_coupling, g_squared, 5)[1:]
+    ramp_couplings = np.linspace(start_coupling, g, 5)[1:]
     print(f"  Stage 2: ramping through {[f'{g:.3f}' for g in ramp_couplings]}")
     for g2 in ramp_couplings:
-        H_step = QuantumLinkModel(lattice, g_squared=g2,
+        H_step = QuantumLinkModel(lattice, g=g2,
                                   gauss_penalty=penalty).build_hamiltonian()
         dmrg = qtn.DMRG2(pauli_op_to_mpo(H_step, n), which='SA',
                          bond_dims=[128, max_bond], cutoffs=1e-12, p0=current_state)
         dmrg.solve(tol=1e-10, max_sweeps=20)
         current_state = dmrg.state
-        print(f"    g²={g2:.3f}  energy={dmrg.energy}")
+        print(f"    g={g2:.3f}  energy={dmrg.energy}")
 
     return dmrg.energy, dmrg.state
 
 
-def validate_dmrg(lattice, g_squared):
+def validate_dmrg(lattice, g):
     """Cross-check exact diagonalisation against DMRG on the same lattice."""
-    print(f"\n--- Validating DMRG (g²={g_squared}) ---")
+    print(f"\n--- Validating DMRG (g={g}) ---")
 
-    energy_exact, gs_exact, _ = get_ground_state(lattice, g_squared)
+    energy_exact, gs_exact, _ = get_ground_state(lattice, g)
     print(f"  Exact energy:  {energy_exact:.8f}")
 
-    energy_dmrg, gs_mps = get_ground_state_dmrg(lattice, g_squared)
+    energy_dmrg, gs_mps = get_ground_state_dmrg(lattice, g)
     print(f"  DMRG energy:   {energy_dmrg:.8f}")
     print(f"  Difference:    {abs(energy_exact - energy_dmrg):.2e}")
     print(f"  MPS bonds:     {gs_mps.bond_sizes()}")
@@ -198,22 +198,20 @@ def explore_dmrg_lattice(lattice, max_bond):
     print(f"\n{lattice.width}x{lattice.height} lattice: {lattice.n_qubits} qubits")
 
     for label, g2 in [("High", 1.0), ("Low", 0.1)]:
-        energy, gs_mps = get_ground_state_dmrg(lattice, g_squared=g2, max_bond=max_bond)
+        energy, gs_mps = get_ground_state_dmrg(lattice, g=g2, max_bond=max_bond)
         print(f"Energy {label} Coupling: {energy}")
         print(f"MPS bonds {label} Coupling: {gs_mps.bond_sizes()}")
         print(f"Max bond {label} Coupling: {max(gs_mps.bond_sizes())}")
 
     for g2 in [1.0, 0.1]:
-        print(f"\n--- g² = {g2} ---")
-        energy_pen, _ = get_ground_state_dmrg(lattice, g_squared=g2,
+        print(f"\n--- g = {g2} ---")
+        energy_pen, _ = get_ground_state_dmrg(lattice, g=g2,
                                               penalty=20.0, max_bond=max_bond)
-        energy_nopen, _ = get_ground_state_dmrg(lattice, g_squared=g2,
+        energy_nopen, _ = get_ground_state_dmrg(lattice, g=g2,
                                                 penalty=0.0, max_bond=max_bond)
-        electric_shift = g2 / 8.0 * lattice.n_links_total
         print(f"  With penalty:         {energy_pen}")
         print(f"  Without penalty:      {energy_nopen}")
         print(f"  Penalty contribution: {energy_pen - energy_nopen}")
-        print(f"  Electric shift:       {electric_shift}")
 
 
 # =============================================================================
@@ -225,7 +223,7 @@ def plot_coupling_scan(results, chi_values):
     fig, ax = plt.subplots(figsize=(8, 6))
     for r in results:
         errs = [r['errors'][chi] for chi in chi_values]
-        label = f"g²={r['coupling']} (max bond={r['max_exact_bond']})"
+        label = f"g={r['coupling']} (max bond={r['max_exact_bond']})"
         ax.semilogy(chi_values, errs, 'o-', label=label, markersize=5)
 
     ax.set_xlabel('Bond dimension χ', fontsize=12)
@@ -263,7 +261,7 @@ def plot_bond_dimensions(results):
     for idx, r in enumerate(results):
         bonds = r['exact_bonds']
         positions = np.arange(len(bonds)) + idx * width
-        ax.bar(positions, bonds, width, label=f"g²={r['coupling']}", alpha=0.8)
+        ax.bar(positions, bonds, width, label=f"g={r['coupling']}", alpha=0.8)
 
     ax.set_xlabel('Bond index (cut position)', fontsize=12)
     ax.set_ylabel('Exact bond dimension', fontsize=12)
@@ -293,9 +291,9 @@ if __name__ == "__main__":
 
     # Experiment 2: compression vs lattice size at fixed coupling.
     print("\n" + "=" * 60)
-    print("EXPERIMENT 2: Compression vs lattice size (g²=1.0)")
+    print("EXPERIMENT 2: Compression vs lattice size (g=1.0)")
     print("=" * 60)
-    lattice_results = run_lattice_scan([(2, 3)], g_squared=1.0, chi_values=chi_values)
+    lattice_results = run_lattice_scan([(2, 3)], g=1.0, chi_values=chi_values)
     plot_lattice_scan(lattice_results, chi_values)
 
     # Experiment 3: validate DMRG against exact diagonalisation, then explore
@@ -303,9 +301,9 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("EXPERIMENT 3: DMRG validation")
     print("=" * 60)
-    validate_dmrg(lattice_2x3, g_squared=1.0)
-    validate_dmrg(lattice_2x3, g_squared=0.1)
-    validate_dmrg(LatticeGrid(width=3, height=3), g_squared=1.0)
+    validate_dmrg(lattice_2x3, g=1.0)
+    validate_dmrg(lattice_2x3, g=0.1)
+    validate_dmrg(LatticeGrid(width=3, height=3), g=1.0)
 
     explore_dmrg_lattice(LatticeGrid(width=3, height=4), max_bond=128)
     explore_dmrg_lattice(LatticeGrid(width=4, height=4), max_bond=512)
