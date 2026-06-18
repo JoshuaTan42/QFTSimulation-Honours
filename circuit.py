@@ -1,3 +1,11 @@
+"""Time evolution for the pure-gauge U(1) quantum link model.
+
+Provides a generic second-order Suzuki-Trotter circuit (TrotterEvolution) as a
+baseline, the structured constant-depth Trotter step (StructuredTrotter,
+following Joshi et al. 2026), and an exact statevector simulator used to track
+observables and benchmark circuits (DynamicalSimulation).
+"""
+
 from qiskit import QuantumCircuit, transpile
 from qiskit.circuit.library import PauliEvolutionGate, StatePreparation
 from qiskit.synthesis import SuzukiTrotter
@@ -8,6 +16,8 @@ from scipy.sparse.linalg import expm_multiply
 
 
 class TrotterEvolution:
+    """Generic second-order Suzuki-Trotter evolution of an arbitrary Hamiltonian."""
+
     def __init__(self, hamiltonian, n_qubits: int, total_time: float, n_steps: int):
         self.hamiltonian = hamiltonian
         self.n_qubits = n_qubits
@@ -26,6 +36,11 @@ class TrotterEvolution:
 
 
 class StructuredTrotter:
+    """One constant-depth Trotter step: half-electric, two plaquette sublayers,
+    half-electric (Joshi et al. 2026). The checkerboard sublayer split keeps the
+    two-qubit gate depth independent of lattice size.
+    """
+
     def __init__(self, lattice, g_squared=1.0, J=1.0, dt=0.05):
         self.lattice = lattice
         self.n_qubits = lattice.n_qubits
@@ -55,23 +70,19 @@ class StructuredTrotter:
     def _apply_plaquette_sublayer(self, qc, plaquettes):
         if self.J == 0.0:
             return
-        plaq_paulis = [
-            ("XXXX", +1.0), ("XXYY", -1.0), ("XYXY", +1.0), ("XYYX", +1.0),
-            ("YXXY", +1.0), ("YXYX", +1.0), ("YYXX", -1.0), ("YYYY", +1.0),
-        ]
-        for l1, l2, l3, l4 in plaquettes:
-            qubits = [l1, l2, l3, l4]
-            for pauli_str, sign in plaq_paulis:
-                paulis = list(pauli_str)
+        for qubits in plaquettes:
+            for pauli_str, sign in QuantumLinkModel._PLAQ_PAULIS:
                 self._exp_pauli_string(qc, sign * self.dt * self.J / 8.0,
-                                        qubits, paulis)
+                                       list(qubits), list(pauli_str))
 
     def _apply_electric_layer(self, qc, fraction=1.0):
+        """Parallel single-qubit Rz rotations realising exp(-i dt H_E * fraction)."""
         angle = self.dt * self.g_squared * fraction / 4.0
         for link_q in self.electric_qubits:
             qc.rz(angle, link_q)
 
     def _exp_pauli_string(self, qc, angle, qubits, paulis):
+        """exp(-i*angle*P) via the CNOT-ladder + Rz + reverse-ladder construction."""
         for q, p in zip(qubits, paulis):
             if p == 'X':
                 qc.h(q)
@@ -96,6 +107,11 @@ class StructuredTrotter:
 
 
 class DynamicalSimulation:
+    """Exact statevector evolution under H, tracking energy, Gauss violation,
+    plaquette expectation and the electric-field profile. run_on_backend rebuilds
+    the same evolution from structured Trotter steps to estimate circuit resources.
+    """
+
     def __init__(self, hamiltonian, lattice,
                  g_squared=1.0, J=1.0,
                  total_time=20.0, n_steps=400,
