@@ -2,8 +2,9 @@
 
 Builds the gauge Hamiltonian on a 3x3 cylinder, checks gauge invariance,
 compares structured vs generic Trotter circuit depth, finds the gauge-invariant
-ground state by exact diagonalisation, then quenches J and tracks the dynamics
-both exactly (statevector) and via structured-Trotter circuits on Aer.
+ground state by exact diagonalisation, quenches J and tracks the dynamics both
+exactly (statevector) and via structured-Trotter circuits on Aer, and finally
+prepares the ground state with RQSVT (structured Trotter + LCU filter) on Aer.
 """
 
 import numpy as np
@@ -15,6 +16,7 @@ from qiskit_aer import AerSimulator
 from lattice import LatticeGrid
 from QuantumFields.gauge_field import GaussLaw, QuantumLinkModel
 from circuit import DynamicalSimulation, StructuredTrotter, TrotterEvolution
+from rqsvt import RQSVTGroundState
 
 # --- Parameters -----------------------------------------------------------
 WIDTH, HEIGHT = 3, 3
@@ -22,6 +24,12 @@ G = 6.0   # linear electric-field strength
 J_INITIAL = 2.0
 J_QUENCH = 0.5
 PENALTY = 200.0
+
+# RQSVT ground-state demo runs on a small lattice by default so the (deep) LCU
+# circuit finishes quickly on Aer's statevector simulator. Scale up by changing
+# these -- note statevector caps near ~24 qubits (system + log2(degree) ancillas),
+# so 5x4 / 7x6 need an MPS backend or hardware.
+RQSVT_WIDTH, RQSVT_HEIGHT = 2, 3
 
 TOTAL_TIME = 20.0
 N_STEPS = 400
@@ -213,6 +221,41 @@ def print_summary(lattice, eigenvalues, step_s, step_g, results, results_aer,
     print("=" * 60)
 
 
+def run_rqsvt_ground_state(width=RQSVT_WIDTH, height=RQSVT_HEIGHT,
+                           n_trotter_list=(1, 2)):
+    """RQSVT ground-state preparation: structured Trotter + LCU filter on Aer.
+
+    Filters the strong-coupling vacuum |0...0> onto the ground state of the
+    confining Hamiltonian (g=G, J=J_INITIAL). Reports the unfiltered baseline,
+    an exact-evolution cross-check, and the structured-Trotter result with
+    Richardson extrapolation, all against exact diagonalisation.
+    """
+    print("\n" + "=" * 60)
+    print(f"RQSVT GROUND-STATE PREPARATION ({width}x{height})")
+    print("=" * 60)
+    lattice = LatticeGrid(width=width, height=height)
+    rq = RQSVTGroundState(lattice, g=G, J=J_INITIAL)
+
+    e_guess, ov_guess = rq.guess_energy()
+    print(f"Filter degree:        {rq.degree}  "
+          f"({rq.n_anc} ancillas, {lattice.n_qubits + rq.n_anc} qubits total)")
+    print(f"Exact ground energy:  E0 = {rq.E0:.6f}   gap Delta = {rq.E1 - rq.E0:.4f}")
+    print(f"Guess |0...0>:        E  = {e_guess:.6f}   overlap = {ov_guess:.4f}")
+
+    aer = AerSimulator(method='statevector')
+
+    res = rq.prepare(aer, backend='exact')                 # exact-U cross-check
+    print(f"RQSVT (exact U):      E  = {res['energy']:.6f}   "
+          f"overlap = {res['overlap']:.4f}   P(success) = {res['success_prob']:.3f}")
+
+    est = rq.estimate_energy(aer, backend='trotter', n_trotter_list=n_trotter_list)
+    for n, r in est['runs']:
+        print(f"RQSVT (trotter n={n}):  E  = {r['energy']:.6f}   overlap = {r['overlap']:.4f}")
+    print(f"RQSVT (Richardson):   E  = {est['energy_richardson']:.6f}   "
+          f"(target E0 = {rq.E0:.6f})")
+    print("=" * 60)
+
+
 def main():
     lattice = LatticeGrid(width=WIDTH, height=HEIGHT)
     lattice.debug()
@@ -229,6 +272,8 @@ def main():
 
     print_summary(lattice, eigenvalues, step_s, step_g, results, results_aer,
                   depths, two_q)
+
+    run_rqsvt_ground_state()
 
 
 if __name__ == "__main__":
