@@ -61,7 +61,7 @@ def richardson_extrapolate(hs, ys):
 class RQSVTGroundState:
     """LCU realisation of the RQSVT ground-state filter for the pure-gauge U(1) QLM."""
 
-    def __init__(self, lattice, g=6.0, J=2.0, eta_max=2.6, resolve=2.5, max_degree=40):
+    def __init__(self, lattice, g=6.0, J=2.0, eta_max=2.6, resolve=2.5, max_degree=16):
         self.lattice = lattice
         self.n = lattice.n_qubits
         self.g, self.J = g, J
@@ -94,12 +94,30 @@ class RQSVTGroundState:
 
     # ---- controlled evolution U^power = e^{i scale*power*H} ----
 
+    def _append_controlled_power(self, qc, ctrl, sys, power, backend,
+                                 n_trotter, qdrift_steps, rng):
+        """Append controlled-U^power (control = |1>) onto qc.
+
+        For 'exact' we build the controlled unitary as an explicit block-diagonal
+        matrix and append it as a single `unitary` instruction, which Aer applies
+        natively. This deliberately avoids Gate.control() on a dense UnitaryGate:
+        that path calls Quantum Shannon Decomposition to synthesise the n-qubit
+        unitary into ~4^n elementary gates (and verifies it by einsum), which is
+        intractable beyond a handful of qubits.
+        """
+        if backend == 'exact':
+            dim = 2 ** self.n
+            U = expm(1j * self.scale * power * self.H_phys.to_matrix())
+            cmat = np.eye(2 * dim, dtype=complex)
+            cmat[dim:, dim:] = U                          # control (MSB) = |1> -> apply U
+            qc.unitary(cmat, list(sys) + [ctrl], label=f"cU^{power}")
+        else:
+            gate = self._evolution_gate(power, backend, n_trotter, qdrift_steps, rng)
+            qc.append(gate.control(1), [ctrl] + list(sys))
+
     def _evolution_gate(self, power, backend, n_trotter, qdrift_steps, rng):
         qc = QuantumCircuit(self.n, name=f"U^{power}")
-        if backend == 'exact':
-            U = expm(1j * self.scale * power * self.H_phys.to_matrix())
-            qc.append(UnitaryGate(U, label=f"U^{power}"), range(self.n))
-        elif backend == 'trotter':
+        if backend == 'trotter':
             dt = -self.scale / n_trotter                       # negative dt -> e^{+iH|dt|}
             step = StructuredTrotter(self.lattice, g=self.g, J=self.J, dt=dt).build_step()
             for _ in range(power * n_trotter):
@@ -150,9 +168,8 @@ class RQSVTGroundState:
             qc.p(-(2 ** j) * self.eta0, a)
         # SELECT: bit j controls U^{2^j}
         for j, a in enumerate(anc):
-            cU = self._evolution_gate(2 ** j, backend, n_trotter,
-                                      qdrift_steps, rng).control(1)
-            qc.append(cU, [a] + sys)
+            self._append_controlled_power(qc, a, sys, 2 ** j, backend,
+                                          n_trotter, qdrift_steps, rng)
         qc.append(prep.inverse(), anc)
         return qc
 
@@ -164,8 +181,8 @@ class RQSVTGroundState:
         import qiskit_aer  # noqa: F401  -- registers .save_statevector() on QuantumCircuit
         qc = self.build_circuit(backend, n_trotter, qdrift_steps, seed)
         qc.save_statevector()
-        sv = np.asarray(aer_backend.run(transpile(qc, aer_backend)).result()
-                        .get_statevector())
+        sv = np.asarray(aer_backend.run(transpile(qc, aer_backend, optimization_level=0))
+                        .result().get_statevector())
 
         psi = sv[:2 ** self.n]                              # ancilla=|0...0> block (ancilla = MSBs)
         success = float(np.vdot(psi, psi).real)
