@@ -1,13 +1,21 @@
 """Top-level pipeline for the pure-gauge U(1) quantum link model.
 
 Builds the gauge Hamiltonian on a 3x3 cylinder, checks gauge invariance,
-compares structured vs generic Trotter circuit depth, finds the gauge-invariant
-ground state by exact diagonalisation, quenches J and tracks the dynamics both
-exactly (statevector) and via structured-Trotter circuits on Aer, and finally
-prepares the ground state with RQSVT (structured Trotter + LCU filter) on Aer.
+compares structured vs generic Trotter circuit depth, reports the ground state
+by exact diagonalisation, then evolves a far-from-equilibrium gauge-invariant
+"string" state (Joshi et al.) both exactly and via structured-Trotter circuits
+on Aer, and finally prepares the ground state with RQSVT on Aer.
+
+Note: the strong-coupling vacuum |0...0> is a universal eigenstate
+(H_box|0...0> = 0), so quenching from the confined ground state is inert. Real
+dynamics need a far-from-equilibrium gauge-invariant state, found by
+find_string_state.
 """
 
+import itertools
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")          # non-interactive: save figures, never block on a GUI window
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import eigsh
 from qiskit import transpile
@@ -20,16 +28,16 @@ from rqsvt import RQSVTGroundState
 
 # --- Parameters -----------------------------------------------------------
 WIDTH, HEIGHT = 3, 3
-G = 6.0   # linear electric-field strength
-J_INITIAL = 2.0
-J_QUENCH = 0.5
+G = 2.0   # linear electric-field strength (moderate -> visible string fluctuation)
+J = 2.0   # plaquette coupling
 PENALTY = 200.0
 
 # RQSVT ground-state demo runs on a small lattice by default so the (deep) LCU
-# circuit finishes quickly on Aer's statevector simulator. Scale up by changing
-# these -- note statevector caps near ~24 qubits (system + log2(degree) ancillas),
-# so 5x4 / 7x6 need an MPS backend or hardware.
+# circuit finishes quickly on Aer; statevector caps near ~24 qubits, so 5x4 / 7x6
+# need an MPS backend or hardware. RQSVT_G sits near the confinement crossover so
+# the |0...0> guess has partial (filterable) overlap with the true ground state.
 RQSVT_WIDTH, RQSVT_HEIGHT = 2, 3
+RQSVT_G = 1.0
 
 TOTAL_TIME = 20.0
 N_STEPS = 400
@@ -43,7 +51,7 @@ BASIS_GATES = ['cx', 'rz', 'ry', 'rx', 'h', 'x', 'y', 'z', 's', 'sdg']
 def check_gauge_invariance(lattice):
     """||[G_j, H]|| should be ~0 for every interior site."""
     print("\n=== Gauge invariance check ===")
-    qlm = QuantumLinkModel(lattice, g=G, J=J_INITIAL)
+    qlm = QuantumLinkModel(lattice, g=G, J=J)
     H = qlm.build_hamiltonian()
     for idx, G_op in enumerate(GaussLaw(lattice).build_gauss_operators()):
         if G_op is None:
@@ -57,9 +65,9 @@ def check_gauge_invariance(lattice):
 def compare_circuit_depth(lattice):
     """Structured (constant-depth) vs generic second-order Trotter step."""
     print("\n=== Circuit depth comparison ===")
-    H = QuantumLinkModel(lattice, g=G, J=J_INITIAL).build_hamiltonian()
+    H = QuantumLinkModel(lattice, g=G, J=J).build_hamiltonian()
 
-    structured = StructuredTrotter(lattice, g=G, J=J_INITIAL, dt=DT)
+    structured = StructuredTrotter(lattice, g=G, J=J, dt=DT)
     step_s = transpile(structured.build_step(), basis_gates=BASIS_GATES,
                        optimization_level=3)
     print(f"Structured: depth={step_s.depth()}, CNOTs={step_s.count_ops().get('cx', 0)}")
@@ -74,13 +82,13 @@ def compare_circuit_depth(lattice):
 def find_ground_state(lattice):
     """Lowest two eigenstates of the penalised Hamiltonian via sparse ED."""
     print("\n=== Finding gauge-invariant ground state ===")
-    qlm = QuantumLinkModel(lattice, g=G, J=J_INITIAL,
+    qlm = QuantumLinkModel(lattice, g=G, J=J,
                            gauss_penalty=PENALTY)
     H_sparse = qlm.build_hamiltonian().to_matrix(sparse=True)
     eigenvalues, eigenvectors = eigsh(H_sparse, k=2, which='SA')
     gs_vector = eigenvectors[:, 0]
 
-    print(f"Initial parameters: g={G}, J={J_INITIAL}")
+    print(f"Initial parameters: g={G}, J={J}")
     print(f"Ground state energy: {eigenvalues[0]:.6f}")
     print(f"First excited:       {eigenvalues[1]:.6f}")
     print(f"Gap:                 {eigenvalues[1] - eigenvalues[0]:.6f}")
@@ -88,22 +96,60 @@ def find_ground_state(lattice):
     return eigenvalues, gs_vector
 
 
-def run_quench(lattice, gs_vector):
-    """Quench J: J_INITIAL -> J_QUENCH and evolve the ground state."""
-    print(f"\n=== Quench dynamics (J: {J_INITIAL} → {J_QUENCH}) ===")
-    H_evolve = QuantumLinkModel(lattice, g=G, J=J_QUENCH,
-                                gauss_penalty=PENALTY).build_hamiltonian()
+def find_string_state(lattice):
+    """A far-from-equilibrium, gauge-invariant, H_box-active product state.
 
-    initial_energy = np.conj(gs_vector) @ H_evolve.to_matrix(sparse=True) @ gs_vector
-    print(f"Quench parameters: g={G}, J={J_QUENCH}")
-    print(f"Terms in H_evolve: {len(H_evolve)}")
-    print(f"Initial energy in quenched H: {initial_energy.real:.6f}")
+    Brute-forces the lowest-weight computational basis state that (i) satisfies
+    Gauss's law at every interior site and (ii) has a plaquette in the
+    (up,up,down,down) pattern so H_box acts on it (hence it is NOT an eigenstate
+    and will evolve). Returns the statevector and the list of flipped links.
+    """
+    n = lattice.n_qubits
+    if n > 20:
+        raise ValueError(f"brute-force string search infeasible for {n} links")
+    W, H = lattice.width, lattice.height
+    interior = [(i, j) for j in range(1, H - 1) for i in range(W)]
+    plaqs = lattice.get_plaquettes()                       # (bottom, right, top, left)
+
+    def gauss_ok(down):
+        sz = [(-0.5 if q in down else 0.5) for q in range(n)]
+        for i, j in interior:
+            g = (sz[lattice.get_horizontal_link_index(i, j)]
+                 - sz[lattice.get_horizontal_link_index((i - 1) % W, j)]
+                 + sz[lattice.get_vertical_link_index(i, j)]
+                 - sz[lattice.get_vertical_link_index(i, j - 1)])
+            if abs(g) > 1e-9:
+                return False
+        return True
+
+    def hbox_active(down):
+        for bo, r, t, l in plaqs:
+            pat = tuple(int(q in down) for q in (bo, r, t, l))
+            if pat in ((1, 1, 0, 0), (0, 0, 1, 1)):
+                return True
+        return False
+
+    for weight in range(2, n + 1):
+        for down in itertools.combinations(range(n), weight):
+            down = set(down)
+            if gauss_ok(down) and hbox_active(down):
+                sv = np.zeros(2 ** n, dtype=complex)
+                sv[sum(1 << q for q in down)] = 1.0
+                return sv, sorted(down)
+    raise RuntimeError("no gauge-invariant H_box-active string state found")
+
+
+def run_string_dynamics(lattice, string_state, flipped):
+    """Evolve a far-from-equilibrium string state under the static H(G, J)."""
+    print(f"\n=== String dynamics (flipped links {flipped}) ===")
+    H = QuantumLinkModel(lattice, g=G, J=J, gauss_penalty=PENALTY).build_hamiltonian()
+    print(f"Parameters: g={G}, J={J}   (H_box-active string, not an eigenstate)")
 
     sim = DynamicalSimulation(
-        H_evolve, lattice,
-        g=G, J=J_QUENCH,
+        H, lattice,
+        g=G, J=J,
         total_time=TOTAL_TIME, n_steps=N_STEPS,
-        initial_state=gs_vector,
+        initial_state=string_state,
         use_structured_trotter=True,
     )
     results = sim.run()
@@ -119,8 +165,8 @@ def plot_observables(lattice, results):
     axes[0].plot(results['times'], results['energies'], 'b-', linewidth=2)
     axes[0].set_ylabel('Energy ⟨H⟩', fontsize=12)
     axes[0].set_title(
-        f'Pure gauge quench dynamics ({lattice.width}×{lattice.height}, '
-        f'{lattice.n_qubits} qubits)\nJ: {J_INITIAL} → {J_QUENCH}', fontsize=13)
+        f'Pure gauge string dynamics ({lattice.width}×{lattice.height}, '
+        f'{lattice.n_qubits} qubits)\ng={G}, J={J}', fontsize=13)
     axes[0].grid(alpha=0.3)
 
     axes[1].plot(results['times'], results['gauss_violations'], 'r-', linewidth=2)
@@ -136,7 +182,7 @@ def plot_observables(lattice, results):
     plt.tight_layout()
     plt.savefig('pure_gauge_observables.png', dpi=150, bbox_inches='tight')
     print("\n[Saved: pure_gauge_observables.png]")
-    plt.show()
+    plt.close(fig)
 
 
 def plot_efield(lattice, results, results_aer):
@@ -164,7 +210,7 @@ def plot_efield(lattice, results, results_aer):
     plt.tight_layout()
     plt.savefig('pure_gauge_efield.png', dpi=150, bbox_inches='tight')
     print("[Saved: pure_gauge_efield.png]")
-    plt.show()
+    plt.close(fig)
 
 
 def plot_scaling(results_aer):
@@ -190,7 +236,7 @@ def plot_scaling(results_aer):
     plt.tight_layout()
     plt.savefig('pure_gauge_scaling.png', dpi=150, bbox_inches='tight')
     print("[Saved: pure_gauge_scaling.png]")
-    plt.show()
+    plt.close(fig)
     return depths, two_q
 
 
@@ -201,8 +247,7 @@ def print_summary(lattice, eigenvalues, step_s, step_g, results, results_aer,
     print("=" * 60)
     print(f"Lattice size:          {lattice.width}×{lattice.height} "
           f"({lattice.n_qubits} gauge qubits)")
-    print(f"Initial H:             g={G}, J={J_INITIAL}")
-    print(f"Quench H:              g={G}, J={J_QUENCH}")
+    print(f"Hamiltonian:           g={G}, J={J}")
     print(f"Ground state energy:   {eigenvalues[0]:.6f}")
     print(f"Gap:                   {eigenvalues[1] - eigenvalues[0]:.6f}")
     print("\nCircuit comparison:")
@@ -225,22 +270,26 @@ def run_rqsvt_ground_state(width=RQSVT_WIDTH, height=RQSVT_HEIGHT,
                            n_trotter_list=(1, 2)):
     """RQSVT ground-state preparation: structured Trotter + LCU filter on Aer.
 
-    Filters the strong-coupling vacuum |0...0> onto the ground state of the
-    confining Hamiltonian (g=G, J=J_INITIAL). Reports the unfiltered baseline,
-    an exact-evolution cross-check, and the structured-Trotter result with
-    Richardson extrapolation, all against exact diagonalisation.
+    Filters the strong-coupling vacuum |0...0> onto the ground state at (RQSVT_G,
+    J). RQSVT only has work to do when the guess has partial overlap: if the
+    reported overlap is ~1 the regime is too confined (guess already the ground
+    state); if ~0 it is too magnetic (guess orthogonal). Tune RQSVT_G accordingly.
     """
     print("\n" + "=" * 60)
-    print(f"RQSVT GROUND-STATE PREPARATION ({width}x{height})")
+    print(f"RQSVT GROUND-STATE PREPARATION ({width}x{height}, g={RQSVT_G})")
     print("=" * 60)
     lattice = LatticeGrid(width=width, height=height)
-    rq = RQSVTGroundState(lattice, g=G, J=J_INITIAL)
+    rq = RQSVTGroundState(lattice, g=RQSVT_G, J=J)
 
     e_guess, ov_guess = rq.guess_energy()
     print(f"Filter degree:        {rq.degree}  "
           f"({rq.n_anc} ancillas, {lattice.n_qubits + rq.n_anc} qubits total)")
     print(f"Exact ground energy:  E0 = {rq.E0:.6f}   gap Delta = {rq.E1 - rq.E0:.4f}")
     print(f"Guess |0...0>:        E  = {e_guess:.6f}   overlap = {ov_guess:.4f}")
+    if ov_guess > 0.99:
+        print("  [!] guess overlap ~1: lower RQSVT_G for a non-trivial filter demo")
+    elif ov_guess < 0.05:
+        print("  [!] guess overlap ~0: raise RQSVT_G so the guess overlaps the ground state")
 
     aer = AerSimulator(method='statevector')
 
@@ -264,7 +313,8 @@ def main():
     check_gauge_invariance(lattice)
     step_s, step_g = compare_circuit_depth(lattice)
     eigenvalues, gs_vector = find_ground_state(lattice)
-    results, results_aer = run_quench(lattice, gs_vector)
+    string_state, flipped = find_string_state(lattice)
+    results, results_aer = run_string_dynamics(lattice, string_state, flipped)
 
     plot_observables(lattice, results)
     plot_efield(lattice, results, results_aer)
