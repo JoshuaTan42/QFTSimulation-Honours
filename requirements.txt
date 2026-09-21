@@ -1,0 +1,7 @@
+numpy>=2.0
+scipy>=1.13
+matplotlib>=3.9
+qiskit>=2.0
+quimb>=1.10          # DMRG cross-check only
+pytest>=8.0          # tests only
+# optional: qiskit-ibm-runtime (DynamicalSimulation.run_on_backend)

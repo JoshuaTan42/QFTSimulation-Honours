@@ -1,0 +1,1298 @@
+{
+  "config": {
+    "width": 3,
+    "height": 3,
+    "g": 0.0,
+    "J": 2.0,
+    "rk": 0.0,
+    "field_pattern": "uniform",
+    "penalty": 200.0,
+    "penalty_scan": [
+      2,
+      10,
+      50,
+      100,
+      150,
+      500,
+      1000
+    ],
+    "dt_scan": [
+      0.1,
+      0.05,
+      0.025
+    ],
+    "seed": 2026
+  },
+  "verification": {
+    "qubits": 15,
+    "qubits_with_ancilla": 16,
+    "max_commutator_l1": 0.0,
+    "uniform_field_commutator_l1": 0.0,
+    "staggered_field_commutator_l1": 20.0,
+    "checkerboard_valid": false
+  },
+  "classical": {
+    "lattices": [
+      {
+        "W": 2,
+        "H": 2,
+        "qubits": 6,
+        "hilbert_dim": 64,
+        "gauge_sector_dim": 64,
+        "charge_sector_dim": 5,
+        "E0_sector": -2.8284271247461903,
+        "gap_in_sector": 2.8284271247461903,
+        "E0_full_space": -2.8284271247461894,
+        "eigsh_spread": 3.552713678800501e-15,
+        "gauss_violation": 0.0,
+        "plate_charges": [
+          0.5,
+          -0.5,
+          -0.5,
+          0.5
+        ]
+      },
+      {
+        "W": 3,
+        "H": 3,
+        "qubits": 15,
+        "hilbert_dim": 32768,
+        "gauge_sector_dim": 1792,
+        "charge_sector_dim": 21,
+        "E0_sector": -5.86704398328971,
+        "gap_in_sector": 1.3949080282901303,
+        "E0_full_space": -5.867043983289653,
+        "eigsh_spread": 3.455014052633487e-13,
+        "gauss_violation": 0.0,
+        "plate_charges": [
+          0.5,
+          -0.5,
+          -0.5,
+          0.5,
+          -0.5,
+          0.5
+        ]
+      }
+    ],
+    "penalty_scan": [
+      {
+        "penalty": 2,
+        "E0": -5.8670439832897285,
+        "violation": 3.296900341634296e-16,
+        "pauli_one_norm": 36.0
+      },
+      {
+        "penalty": 10,
+        "E0": -5.867043983289731,
+        "violation": 3.4897451189473203e-16,
+        "pauli_one_norm": 132.0
+      },
+      {
+        "penalty": 50,
+        "E0": -5.867043983289726,
+        "violation": 7.356483398043118e-16,
+        "pauli_one_norm": 612.0
+      },
+      {
+        "penalty": 100,
+        "E0": -5.867043983289558,
+        "violation": 5.311722740260122e-16,
+        "pauli_one_norm": 1212.0
+      },
+      {
+        "penalty": 150,
+        "E0": -5.867043983289834,
+        "violation": 7.248982211584351e-16,
+        "pauli_one_norm": 1812.0
+      },
+      {
+        "penalty": 500,
+        "E0": -5.867043983289652,
+        "violation": 5.078574343166249e-16,
+        "pauli_one_norm": 6012.0
+      },
+      {
+        "penalty": 1000,
+        "E0": -5.867043983289542,
+        "violation": 3.574898320595874e-16,
+        "pauli_one_norm": 12012.0
+      }
+    ]
+  },
+  "trotter": {
+    "error_scaling": [
+      {
+        "order": 1,
+        "dt": [
+          0.1,
+          0.05,
+          0.025
+        ],
+        "step_error": [
+          0.03977634846253718,
+          0.009986088399133605,
+          0.0024991315880768315
+        ],
+        "fitted_power": 1.9962060344222559
+      },
+      {
+        "order": 2,
+        "dt": [
+          0.1,
+          0.05,
+          0.025
+        ],
+        "step_error": [
+          0.002744607791046122,
+          0.0003450564009290121,
+          4.319414390898471e-05
+        ],
+        "fitted_power": 2.994810229741221
+      }
+    ],
+    "resources": [
+      {
+        "W": 2,
+        "H": 2,
+        "qubits": 6,
+        "plaquettes": 2,
+        "sublayers": 2,
+        "structured": {
+          "qubits": 6,
+          "two_qubit_gates": 26,
+          "one_qubit_gates": 44,
+          "two_qubit_depth": 24,
+          "depth": 54
+        },
+        "structured_pauli": {
+          "qubits": 6,
+          "two_qubit_gates": 34,
+          "one_qubit_gates": 183,
+          "two_qubit_depth": 32,
+          "depth": 117
+        },
+        "generic": {
+          "qubits": 6,
+          "two_qubit_gates": 84,
+          "one_qubit_gates": 223,
+          "two_qubit_depth": 84,
+          "depth": 162
+        }
+      },
+      {
+        "W": 2,
+        "H": 3,
+        "qubits": 10,
+        "plaquettes": 4,
+        "sublayers": 2,
+        "structured": {
+          "qubits": 10,
+          "two_qubit_gates": 52,
+          "one_qubit_gates": 88,
+          "two_qubit_depth": 25,
+          "depth": 54
+        },
+        "structured_pauli": {
+          "qubits": 10,
+          "two_qubit_gates": 68,
+          "one_qubit_gates": 358,
+          "two_qubit_depth": 33,
+          "depth": 118
+        },
+        "generic": {
+          "qubits": 10,
+          "two_qubit_gates": 168,
+          "one_qubit_gates": 438,
+          "two_qubit_depth": 123,
+          "depth": 235
+        }
+      },
+      {
+        "W": 3,
+        "H": 3,
+        "qubits": 15,
+        "plaquettes": 6,
+        "sublayers": 3,
+        "structured": {
+          "qubits": 15,
+          "two_qubit_gates": 78,
+          "one_qubit_gates": 132,
+          "two_qubit_depth": 36,
+          "depth": 78
+        },
+        "structured_pauli": {
+          "qubits": 15,
+          "two_qubit_gates": 102,
+          "one_qubit_gates": 532,
+          "two_qubit_depth": 48,
+          "depth": 171
+        },
+        "generic": {
+          "qubits": 15,
+          "two_qubit_gates": 252,
+          "one_qubit_gates": 632,
+          "two_qubit_depth": 165,
+          "depth": 305
+        }
+      },
+      {
+        "W": 4,
+        "H": 3,
+        "qubits": 20,
+        "plaquettes": 8,
+        "sublayers": 2,
+        "structured": {
+          "qubits": 20,
+          "two_qubit_gates": 104,
+          "one_qubit_gates": 176,
+          "two_qubit_depth": 25,
+          "depth": 54
+        },
+        "structured_pauli": {
+          "qubits": 20,
+          "two_qubit_gates": 136,
+          "one_qubit_gates": 716,
+          "two_qubit_depth": 33,
+          "depth": 118
+        },
+        "generic": {
+          "qubits": 20,
+          "two_qubit_gates": 336,
+          "one_qubit_gates": 836,
+          "two_qubit_depth": 207,
+          "depth": 380
+        }
+      },
+      {
+        "W": 3,
+        "H": 5,
+        "qubits": 27,
+        "plaquettes": 12,
+        "sublayers": 3,
+        "structured": {
+          "qubits": 27,
+          "two_qubit_gates": 156,
+          "one_qubit_gates": 264,
+          "two_qubit_depth": 37,
+          "depth": 79
+        },
+        "structured_pauli": {
+          "qubits": 27,
+          "two_qubit_gates": 204,
+          "one_qubit_gates": 1052,
+          "two_qubit_depth": 49,
+          "depth": 172
+        }
+      },
+      {
+        "W": 4,
+        "H": 4,
+        "qubits": 28,
+        "plaquettes": 12,
+        "sublayers": 2,
+        "structured": {
+          "qubits": 28,
+          "two_qubit_gates": 156,
+          "one_qubit_gates": 264,
+          "two_qubit_depth": 25,
+          "depth": 54
+        },
+        "structured_pauli": {
+          "qubits": 28,
+          "two_qubit_gates": 204,
+          "one_qubit_gates": 1066,
+          "two_qubit_depth": 33,
+          "depth": 118
+        }
+      },
+      {
+        "W": 6,
+        "H": 4,
+        "qubits": 42,
+        "plaquettes": 18,
+        "sublayers": 2,
+        "structured": {
+          "qubits": 42,
+          "two_qubit_gates": 234,
+          "one_qubit_gates": 396,
+          "two_qubit_depth": 25,
+          "depth": 54
+        },
+        "structured_pauli": {
+          "qubits": 42,
+          "two_qubit_gates": 306,
+          "one_qubit_gates": 1599,
+          "two_qubit_depth": 33,
+          "depth": 118
+        }
+      },
+      {
+        "W": 8,
+        "H": 6,
+        "qubits": 88,
+        "plaquettes": 40,
+        "sublayers": 2,
+        "structured": {
+          "qubits": 88,
+          "two_qubit_gates": 520,
+          "one_qubit_gates": 880,
+          "two_qubit_depth": 25,
+          "depth": 54
+        },
+        "structured_pauli": {
+          "qubits": 88,
+          "two_qubit_gates": 680,
+          "one_qubit_gates": 3532,
+          "two_qubit_depth": 33,
+          "depth": 118
+        }
+      }
+    ]
+  },
+  "rqsvt": {
+    "step": {
+      "summary": {
+        "qubits": 16,
+        "sector_dim": 21,
+        "E0": -5.86704398328971,
+        "gap": 1.3949080282901303,
+        "lambda_H": 12.0,
+        "t0": 0.23561944901923448,
+        "filter": "step",
+        "fourier_degree": 68,
+        "signal_operators": 136,
+        "initial_overlap": 0.1642271119495127,
+        "initial_bits": 15022
+      },
+      "exact": {
+        "success_prob": 0.15729504189328608,
+        "numerator": -0.9228569284791803,
+        "energy": -5.867043979080253,
+        "overlap": 0.9999999973692161,
+        "term_rotations": 0
+      },
+      "trotter": {
+        "energy_richardson": -5.866566363453394,
+        "runs": [
+          {
+            "n": 1,
+            "energy": -5.815226769711833,
+            "overlap": 0.9810326525991787,
+            "success_prob": 0.1364855156313297
+          },
+          {
+            "n": 2,
+            "energy": -5.854643787890639,
+            "overlap": 0.9955064149113665,
+            "success_prob": 0.14667414018870042
+          },
+          {
+            "n": 4,
+            "energy": -5.864041880999023,
+            "overlap": 0.9989280839217465,
+            "success_prob": 0.15206233947772152
+          }
+        ],
+        "E0_exact": -5.86704398328971,
+        "error": 0.00047761983631566807
+      },
+      "qdrift": {
+        "energy_richardson": -5.814677086342424,
+        "runs": [
+          {
+            "n": 200,
+            "energy": -5.250924551536114,
+            "overlap": 0.8298399171671955,
+            "success_prob": 0.1674512206677579
+          },
+          {
+            "n": 400,
+            "energy": -5.574014761335204,
+            "overlap": 0.9173917306168834,
+            "success_prob": 0.15768044690993194
+          },
+          {
+            "n": 800,
+            "energy": -5.704649409437797,
+            "overlap": 0.9430091800866252,
+            "success_prob": 0.1521686598307893
+          }
+        ],
+        "E0_exact": -5.86704398328971,
+        "error": 0.05236689694728547
+      },
+      "resources": {
+        "gqsp_trotter_pauli_ladders": {
+          "qubits": 16,
+          "signal_operators": 136,
+          "two_qubit_gates": 32640,
+          "one_qubit_gates": 68952,
+          "two_qubit_depth": 27948,
+          "evolution_time": 16.022122533307943,
+          "lambda_H": 12.0
+        },
+        "filter": "step",
+        "signal_operators": 136,
+        "gqsp_trotter": {
+          "qubits": 16,
+          "signal_operators": 136,
+          "two_qubit_gates": 13056,
+          "one_qubit_gates": 12138,
+          "two_qubit_depth": 8364,
+          "evolution_time": 16.022122533307943,
+          "lambda_H": 12.0
+        },
+        "gqsp_qdrift": {
+          "qubits": 16,
+          "signal_operators": 136,
+          "two_qubit_gates": 1405492,
+          "one_qubit_gates": 1314916,
+          "two_qubit_depth": 1135838,
+          "evolution_time": 16.022122533307943,
+          "lambda_H": 12.0
+        },
+        "block_encoded_qsvt": {
+          "qubits": 22,
+          "two_qubit_gates": 453424,
+          "qubits_unary": 28,
+          "two_qubit_gates_unary_estimate": 183056,
+          "detail": {
+            "terms": 48,
+            "index_qubits": 6,
+            "qubits_qsvt": 22,
+            "qubits_qsvt_unary": 28,
+            "lambda_lcu": 12.0,
+            "select_two_qubit_gates": 3308,
+            "prepare_two_qubit_gates": 13,
+            "two_qubit_gates_per_call": 3334,
+            "two_qubit_gates_per_call_unary_estimate": 1346
+          }
+        }
+      }
+    },
+    "gaussian": {
+      "summary": {
+        "qubits": 16,
+        "sector_dim": 21,
+        "E0": -5.86704398328971,
+        "gap": 1.3949080282901303,
+        "lambda_H": 12.0,
+        "t0": 0.23561944901923448,
+        "filter": "gaussian",
+        "fourier_degree": 34,
+        "signal_operators": 68,
+        "initial_overlap": 0.1642271119495127,
+        "initial_bits": 15022
+      },
+      "exact": {
+        "success_prob": 0.15772546378713886,
+        "numerator": -0.9253810038335081,
+        "energy": -5.8670361881602835,
+        "overlap": 0.999995127316161,
+        "term_rotations": 0
+      },
+      "trotter": {
+        "energy_richardson": -5.866998833674563,
+        "runs": [
+          {
+            "n": 1,
+            "energy": -5.832820380021666,
+            "overlap": 0.989547630843393,
+            "success_prob": 0.1477288643939391
+          },
+          {
+            "n": 2,
+            "energy": -5.858474795379198,
+            "overlap": 0.9973622075089367,
+            "success_prob": 0.15349292627812092
+          },
+          {
+            "n": 4,
+            "energy": -5.864878111659651,
+            "overlap": 0.9993253177169955,
+            "success_prob": 0.15581307308568842
+          }
+        ],
+        "E0_exact": -5.86704398328971,
+        "error": 4.514961514701099e-05
+      },
+      "qdrift": {
+        "energy_richardson": -5.851908095417304,
+        "runs": [
+          {
+            "n": 200,
+            "energy": -5.511431188135988,
+            "overlap": 0.8880970090785377,
+            "success_prob": 0.16280765379959627
+          },
+          {
+            "n": 400,
+            "energy": -5.713993139461424,
+            "overlap": 0.9594530944385508,
+            "success_prob": 0.1585366715373422
+          },
+          {
+            "n": 800,
+            "energy": -5.791031491860558,
+            "overlap": 0.9731651603057044,
+            "success_prob": 0.15153896176529819
+          }
+        ],
+        "E0_exact": -5.86704398328971,
+        "error": 0.015135887872405718
+      },
+      "resources": {
+        "gqsp_trotter_pauli_ladders": {
+          "qubits": 16,
+          "signal_operators": 68,
+          "two_qubit_gates": 16320,
+          "one_qubit_gates": 34476,
+          "two_qubit_depth": 13974,
+          "evolution_time": 8.011061266653972,
+          "lambda_H": 12.0
+        },
+        "filter": "gaussian",
+        "signal_operators": 68,
+        "gqsp_trotter": {
+          "qubits": 16,
+          "signal_operators": 68,
+          "two_qubit_gates": 6528,
+          "one_qubit_gates": 6069,
+          "two_qubit_depth": 4182,
+          "evolution_time": 8.011061266653972,
+          "lambda_H": 12.0
+        },
+        "gqsp_qdrift": {
+          "qubits": 16,
+          "signal_operators": 68,
+          "two_qubit_gates": 702746,
+          "one_qubit_gates": 657458,
+          "two_qubit_depth": 567919,
+          "evolution_time": 8.011061266653972,
+          "lambda_H": 12.0
+        },
+        "block_encoded_qsvt": {
+          "qubits": 22,
+          "two_qubit_gates": 226712,
+          "qubits_unary": 28,
+          "two_qubit_gates_unary_estimate": 91528,
+          "detail": {
+            "terms": 48,
+            "index_qubits": 6,
+            "qubits_qsvt": 22,
+            "qubits_qsvt_unary": 28,
+            "lambda_lcu": 12.0,
+            "select_two_qubit_gates": 3308,
+            "prepare_two_qubit_gates": 13,
+            "two_qubit_gates_per_call": 3334,
+            "two_qubit_gates_per_call_unary_estimate": 1346
+          }
+        }
+      }
+    }
+  },
+  "casimir": {
+    "W2": {
+      "width": 2,
+      "g": 0.0,
+      "J": 1.0,
+      "rk": 0.0,
+      "plates": "fixed",
+      "field_pattern": "uniform",
+      "rows": [
+        {
+          "energy": -1.4142135623730951,
+          "gap": 1.4142135623730951,
+          "dim": 5,
+          "qubits": 6,
+          "plates": "fixed",
+          "d": 1,
+          "full_space": -1.4142135623730678
+        },
+        {
+          "energy": -2.449489742783178,
+          "gap": 1.035276180410083,
+          "dim": 13,
+          "qubits": 10,
+          "plates": "fixed",
+          "d": 2,
+          "full_space": -2.449489742782849
+        },
+        {
+          "energy": -3.5749197948390474,
+          "gap": 0.8428689872701702,
+          "dim": 41,
+          "qubits": 14,
+          "plates": "fixed",
+          "d": 3,
+          "full_space": -3.574919794839041
+        },
+        {
+          "energy": -4.681054477118409,
+          "gap": 0.7090338753428478,
+          "dim": 121,
+          "qubits": 18,
+          "plates": "fixed",
+          "d": 4
+        },
+        {
+          "energy": -5.794074384986491,
+          "gap": 0.6135636273249299,
+          "dim": 365,
+          "qubits": 22,
+          "plates": "fixed",
+          "d": 5
+        },
+        {
+          "energy": -6.906751395035725,
+          "gap": 0.5409608794075771,
+          "dim": 1093,
+          "qubits": 26,
+          "plates": "fixed",
+          "d": 6
+        },
+        {
+          "energy": -8.020439595407844,
+          "gap": 0.48397211235639226,
+          "dim": 3281,
+          "qubits": 30,
+          "plates": "fixed",
+          "d": 7
+        },
+        {
+          "energy": -9.134531414502455,
+          "gap": 0.4379587270196037,
+          "dim": 9841,
+          "qubits": 34,
+          "plates": "fixed",
+          "d": 8
+        },
+        {
+          "energy": -10.249002958248962,
+          "gap": 0.4000139889715868,
+          "dim": 29525,
+          "qubits": 38,
+          "plates": "fixed",
+          "d": 9
+        },
+        {
+          "energy": -11.363742413531758,
+          "gap": 0.36817090783243245,
+          "dim": 88573,
+          "qubits": 42,
+          "plates": "fixed",
+          "d": 10
+        }
+      ],
+      "analysis": {
+        "d": [
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0,
+          10.0
+        ],
+        "E0": [
+          -1.4142135623730951,
+          -2.449489742783178,
+          -3.5749197948390474,
+          -4.681054477118409,
+          -5.794074384986491,
+          -6.906751395035725,
+          -8.020439595407844,
+          -9.134531414502455,
+          -10.249002958248962,
+          -11.363742413531758
+        ],
+        "d_min": 2,
+        "power_law": {
+          "alpha": 9.000000000000007,
+          "a": -0.23075191843962883,
+          "b": -1.113050331883163,
+          "C": 1.8342840478644382,
+          "sse": 5.0572828390618434e-05
+        },
+        "exponential": {
+          "xi": 0.1,
+          "a": -0.23071172881112076,
+          "b": -1.1130542828255616,
+          "C": 3556417.4040683117,
+          "sse": 4.778109748528389e-05
+        },
+        "E_cas": [
+          -0.07041131205030315,
+          0.0073628394227771565,
+          -0.005016880749929342,
+          0.0018987688538718572,
+          0.0019291928689533222,
+          0.002302514702882341,
+          0.0016646462139267015,
+          0.000623159002477891,
+          -0.0007980528608673154,
+          -0.0024871762604998793
+        ],
+        "force_d": [
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        "force": [
+          0.0027320352844526496,
+          -0.003473036809441332,
+          -0.00020187292450524197,
+          0.00013227332751331033,
+          0.0008396778502022251,
+          0.0012313495373970085,
+          0.0015551676314888851
+        ],
+        "alpha_from_force_slope": 0.816966151678297,
+        "force_points": 7,
+        "second_difference_d": [
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0,
+          8.0,
+          9.0
+        ],
+        "second_difference": [
+          -0.09015387164578681,
+          0.019295369776507698,
+          -0.0068852255887197344,
+          0.000342897818847554,
+          -0.0010111903228846586,
+          -0.0004036187224922827,
+          -0.0003797246518963959,
+          -0.0002679115362891338
+        ],
+        "alpha_from_second_difference": 3.054988199313491,
+        "fraction_attractive": 0.75
+      }
+    },
+    "W3": {
+      "width": 3,
+      "g": 0.0,
+      "J": 1.0,
+      "rk": 0.0,
+      "plates": "free",
+      "field_pattern": "uniform",
+      "rows": [
+        {
+          "energy": -1.6180339887498947,
+          "gap": 0.9999999999999991,
+          "dim": 512,
+          "qubits": 9,
+          "plates": "free",
+          "d": 1,
+          "full_space": -1.6180339887498958
+        },
+        {
+          "energy": -2.933521991644855,
+          "gap": 0.6974540141450651,
+          "dim": 1792,
+          "qubits": 15,
+          "plates": "free",
+          "d": 2,
+          "full_space": -2.9335219916455078
+        },
+        {
+          "energy": -4.3559888074017845,
+          "gap": 0.6313839957807197,
+          "dim": 6656,
+          "qubits": 21,
+          "plates": "free",
+          "d": 3
+        },
+        {
+          "energy": -5.730732785002246,
+          "gap": 0.4715258526621575,
+          "dim": 25600,
+          "qubits": 27,
+          "plates": "free",
+          "d": 4
+        },
+        {
+          "energy": -7.144526979234213,
+          "gap": 0.47156427436051906,
+          "dim": 100352,
+          "qubits": 33,
+          "plates": "free",
+          "d": 5
+        },
+        {
+          "energy": -8.525688966477036,
+          "gap": 0.36188932019162223,
+          "dim": 397312,
+          "qubits": 39,
+          "plates": "free",
+          "d": 6
+        }
+      ],
+      "analysis": {
+        "d": [
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0
+        ],
+        "E0": [
+          -1.6180339887498947,
+          -2.933521991644855,
+          -4.3559888074017845,
+          -5.730732785002246,
+          -7.144526979234213,
+          -8.525688966477036
+        ],
+        "d_min": 2,
+        "power_law": {
+          "alpha": 9.000000000000007,
+          "a": -0.17515252717242366,
+          "b": -1.3920706103973932,
+          "C": 6.5525607430852695,
+          "sse": 0.00027570180773185644
+        },
+        "exponential": {
+          "xi": 0.1,
+          "a": -0.17393300871715062,
+          "b": -1.3922892445691946,
+          "C": 12123924.376532791,
+          "sse": 0.0002672279771032643
+        },
+        "E_cas": [
+          -0.050810851180077776,
+          0.025771756322355177,
+          -0.0046244490371813995,
+          0.012702183759750518,
+          -0.009021400074822772,
+          0.0018872230797466472
+        ],
+        "force_d": [
+          3.0,
+          4.0,
+          5.0
+        ],
+        "force": [
+          0.006534786281302329,
+          0.002198475518820686,
+          0.0054074803400019356
+        ],
+        "alpha_from_force_slope": 0.5318681686949844,
+        "force_points": 3,
+        "second_difference_d": [
+          2.0,
+          3.0,
+          4.0,
+          5.0
+        ],
+        "second_difference": [
+          -0.10697881286196931,
+          0.04772283815646805,
+          -0.03905021663150521,
+          0.0326322069891436
+        ],
+        "alpha_from_second_difference": 0.2810389911873885,
+        "fraction_attractive": 0.5
+      }
+    },
+    "W4": {
+      "width": 4,
+      "g": 0.0,
+      "J": 1.0,
+      "rk": 0.0,
+      "plates": "fixed",
+      "field_pattern": "uniform",
+      "rows": [
+        {
+          "energy": -2.4494897427831788,
+          "gap": 1.0352761804100836,
+          "dim": 9,
+          "qubits": 12,
+          "plates": "fixed",
+          "d": 1,
+          "full_space": -2.449489742783208
+        },
+        {
+          "energy": -4.439392293152224,
+          "gap": 0.6546128649243714,
+          "dim": 53,
+          "qubits": 20,
+          "plates": "fixed",
+          "d": 2
+        },
+        {
+          "energy": -6.49837352733863,
+          "gap": 0.4747884090848489,
+          "dim": 341,
+          "qubits": 28,
+          "plates": "fixed",
+          "d": 3
+        },
+        {
+          "energy": -8.554880753599345,
+          "gap": 0.35942875507215,
+          "dim": 2169,
+          "qubits": 36,
+          "plates": "fixed",
+          "d": 4
+        },
+        {
+          "energy": -10.61670401974411,
+          "gap": 0.28012436627141213,
+          "dim": 13825,
+          "qubits": 44,
+          "plates": "fixed",
+          "d": 5
+        },
+        {
+          "energy": -12.681452580779794,
+          "gap": 0.22246898573435558,
+          "dim": 88093,
+          "qubits": 52,
+          "plates": "fixed",
+          "d": 6
+        },
+        {
+          "energy": -14.748604782259608,
+          "gap": 0.1790701659110585,
+          "dim": 561357,
+          "qubits": 60,
+          "plates": "fixed",
+          "d": 7
+        }
+      ],
+      "analysis": {
+        "d": [
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0
+        ],
+        "E0": [
+          -2.4494897427831788,
+          -4.439392293152224,
+          -6.49837352733863,
+          -8.554880753599345,
+          -10.61670401974411,
+          -12.681452580779794,
+          -14.748604782259608
+        ],
+        "d_min": 2,
+        "power_law": {
+          "alpha": 1.2,
+          "a": -0.11333869622818482,
+          "b": -2.06970096493705,
+          "C": -0.21565982809446727,
+          "sse": 1.3827679530718568e-05
+        },
+        "exponential": {
+          "xi": 11.999999999999993,
+          "a": 0.20824368865005186,
+          "b": -2.093097921526179,
+          "C": -0.5461914597863019,
+          "sse": 5.550833201329205e-06
+        },
+        "E_cas": [
+          -0.26645008161794426,
+          -0.18665166704993919,
+          -0.17593193629929527,
+          -0.1627381976229607,
+          -0.15486049883067565,
+          -0.14990809492931056,
+          -0.14735933147207447
+        ],
+        "force_d": [
+          3.0,
+          4.0,
+          5.0,
+          6.0
+        ],
+        "force": [
+          -0.011956734713489237,
+          -0.010535718734309807,
+          -0.006415051346825074,
+          -0.0037505836793005898
+        ],
+        "alpha_from_force_slope": 1.6661551499071883,
+        "force_points": 4,
+        "second_difference_d": [
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0
+        ],
+        "second_difference": [
+          -0.06907868381736026,
+          0.0024740079256897474,
+          -0.005316039884049495,
+          -0.0029252948909181953,
+          -0.0024036404441307724
+        ],
+        "alpha_from_second_difference": 1.6360582937779218,
+        "fraction_attractive": 0.8
+      }
+    },
+    "W6": {
+      "width": 6,
+      "g": 0.0,
+      "J": 1.0,
+      "rk": 0.0,
+      "plates": "fixed",
+      "field_pattern": "uniform",
+      "rows": [
+        {
+          "energy": -3.6302766211130906,
+          "gap": 0.9845253100485025,
+          "dim": 20,
+          "qubits": 18,
+          "plates": "fixed",
+          "d": 1
+        },
+        {
+          "energy": -6.593686901853201,
+          "gap": 0.583374023992854,
+          "dim": 253,
+          "qubits": 30,
+          "plates": "fixed",
+          "d": 2
+        },
+        {
+          "energy": -9.65833761657855,
+          "gap": 0.3899380574529925,
+          "dim": 3725,
+          "qubits": 42,
+          "plates": "fixed",
+          "d": 3
+        },
+        {
+          "energy": -12.723532401928333,
+          "gap": 0.26644554177569724,
+          "dim": 53812,
+          "qubits": 54,
+          "plates": "fixed",
+          "d": 4
+        }
+      ]
+    },
+    "W4_rk0.5": {
+      "width": 4,
+      "g": 0.0,
+      "J": 1.0,
+      "rk": 0.5,
+      "plates": "fixed",
+      "field_pattern": "uniform",
+      "rows": [
+        {
+          "energy": -1.1774096808992838,
+          "gap": 0.7631961185261884,
+          "dim": 9,
+          "qubits": 12,
+          "plates": "fixed",
+          "d": 1,
+          "full_space": -1.177409680899657
+        },
+        {
+          "energy": -2.1305758531170107,
+          "gap": 0.4226271151772303,
+          "dim": 53,
+          "qubits": 20,
+          "plates": "fixed",
+          "d": 2
+        },
+        {
+          "energy": -3.100758170367306,
+          "gap": 0.3006944007057988,
+          "dim": 341,
+          "qubits": 28,
+          "plates": "fixed",
+          "d": 3
+        },
+        {
+          "energy": -4.073546073402638,
+          "gap": 0.22800078593805306,
+          "dim": 2169,
+          "qubits": 36,
+          "plates": "fixed",
+          "d": 4
+        },
+        {
+          "energy": -5.048186315511068,
+          "gap": 0.17988836887673987,
+          "dim": 13825,
+          "qubits": 44,
+          "plates": "fixed",
+          "d": 5
+        },
+        {
+          "energy": -6.02415254253447,
+          "gap": 0.1455843820823839,
+          "dim": 88093,
+          "qubits": 52,
+          "plates": "fixed",
+          "d": 6
+        },
+        {
+          "energy": -7.0010872080172435,
+          "gap": 0.11995588333523521,
+          "dim": 561357,
+          "qubits": 60,
+          "plates": "fixed",
+          "d": 7
+        }
+      ],
+      "analysis": {
+        "d": [
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          7.0
+        ],
+        "E0": [
+          -1.1774096808992838,
+          -2.1305758531170107,
+          -3.100758170367306,
+          -4.073546073402638,
+          -5.048186315511068,
+          -6.02415254253447,
+          -7.0010872080172435
+        ],
+        "d_min": 2,
+        "power_law": {
+          "alpha": 1.2,
+          "a": -0.04296721400533926,
+          "b": -0.97972469724877,
+          "C": -0.147370213065366,
+          "sse": 2.220082132805209e-07
+        },
+        "exponential": {
+          "xi": 2.9999999999999987,
+          "a": -0.1395981281869232,
+          "b": -0.9793410690744668,
+          "C": -0.06290147737386612,
+          "sse": 5.281295644434854e-11
+        },
+        "E_cas": [
+          -0.15471776964517447,
+          -0.1281592446141313,
+          -0.11861686461565668,
+          -0.11168007040221894,
+          -0.10659561526187833,
+          -0.10283714503650998,
+          -0.10004711327051385
+        ],
+        "force_d": [
+          3.0,
+          4.0,
+          5.0,
+          6.0
+        ],
+        "force": [
+          -0.008239587105956181,
+          -0.006010624676889176,
+          -0.004421462682854482,
+          -0.0032742509956822374
+        ],
+        "alpha_from_force_slope": 1.3232429704020825,
+        "force_points": 4,
+        "second_difference_d": [
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0
+        ],
+        "second_difference": [
+          -0.01701614503256832,
+          -0.00260558578503689,
+          -0.0018523390730980083,
+          -0.0013259849149713787,
+          -0.0009684384593722228
+        ],
+        "alpha_from_second_difference": 1.4739415219218719,
+        "fraction_attractive": 1.0
+      }
+    }
+  },
+  "dmrg": {
+    "validation": [
+      {
+        "exact": -4.898979485566356,
+        "dmrg": -4.8989794788887755,
+        "relative_difference": 1.3630553641193746e-09,
+        "history": [
+          [
+            16,
+            -4.898979421148787
+          ],
+          [
+            32,
+            -4.8989794788887755
+          ]
+        ],
+        "mpo_bond": 11
+      },
+      {
+        "exact": -5.86704398328971,
+        "dmrg": -5.86704398320133,
+        "relative_difference": 1.5063798781945526e-11,
+        "history": [
+          [
+            16,
+            -5.867043980525022
+          ],
+          [
+            32,
+            -5.86704398320133
+          ]
+        ],
+        "mpo_bond": 17
+      }
+    ],
+    "compression": [
+      {
+        "lattice": "2x3",
+        "qubits": 10,
+        "max_exact_bond": 6,
+        "errors": {
+          "2": 0.5416666666666672,
+          "4": 0.1666666666666684,
+          "8": 1.7763568394002505e-15,
+          "16": 1.7763568394002505e-15,
+          "32": 1.7763568394002505e-15
+        }
+      },
+      {
+        "lattice": "3x3",
+        "qubits": 15,
+        "max_exact_bond": 11,
+        "errors": {
+          "2": 0.6389958088051793,
+          "4": 0.37744009160399883,
+          "8": 0.08821244276763907,
+          "16": 0.0,
+          "32": 0.0
+        }
+      }
+    ]
+  },
+  "runtime_seconds": 84.76333045959473
+}

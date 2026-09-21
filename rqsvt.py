@@ -1,225 +1,481 @@
-"""Randomized-QSVT-style ground-state preparation (Wang et al. 2025, arXiv:2510.06851).
+"""Randomised QSVT ground-state preparation (thesis Sec. 2.3.4).
 
-The RQSVT ground-state algorithm filters a guess state onto the ground state with a
-degree-d polynomial P(U) of the controlled time-evolution U = e^{i s H}:
+Single-ancilla implementation in the spirit of Wang et al. (2025): a Fourier
+(Laurent-polynomial) spectral filter F(H) is realised by generalised quantum
+signal processing (GQSP, Motlagh & Wiebe 2024) with the signal operator
 
-    P(U)|phi_0>  ~  <v_0|phi_0> |v_0>          (degree d = O(lambda / Delta))
+        W = exp(i (t0/2) Z_anc (x) H),
 
-We realise the same filter polynomial via a Linear Combination of Unitaries
-(PREPARE-SELECT-UNPREPARE) over time-evolutions:
+so the ancilla-|0> branch evolves forward and the ancilla-|1> branch backward in
+time. No block encoding and no controlled time evolution are needed: for a term
+h_k of H, exp(i theta Z (x) h_k) is an ordinary Pauli rotation on one more
+qubit. 2D signal operators interleaved with 2D+1 single-qubit rotations give
 
-    P(U) = sum_n c_n U^n ,   c_n = exp(-(n sigma)^2 / 2) e^{-i n eta_0}   (Gaussian filter)
+        <0|_anc  circuit  |0>_anc  =  F(H) = sum_{k=-D}^{D} c_k exp(i k t0 H).
 
-This is exact and block-encoding-free (it is a block encoding of P(U) built from
-controlled time-evolutions, never of H). It uses ceil(log2(2d+1)) ancilla qubits
-rather than the single ancilla of the paper's GQSP construction -- a deliberate
-trade: robust, high-degree GQSP phase-factor / complementary-polynomial computation
-(Berntson-Sunderhauf 2024) is a specialised numerical task, whereas the LCU
-coefficients here are exact Gaussian Fourier coefficients. The randomisation
-(qDRIFT), the structured-Trotter evolution, and the Richardson extrapolation are
-identical to the paper.
+Three realisations of W are provided:
+    "exact"    exp(+-i t0 H / 2) applied exactly (reference for the filter),
+    "trotter"  n structured Trotter steps per signal operator,
+    "qdrift"   N randomly sampled term rotations per signal operator
+               (importance sampling with probability |a_k| / lambda_H).
+Energies obtained at several n (or N) are Richardson-extrapolated to 1/n -> 0.
 
-The controlled evolution U^n is realised three ways:
-    'trotter' : structured Trotter step (Joshi et al.)   -- "structured Trotter + RQSVT"
-    'qdrift'  : qDRIFT channel, importance-sampling H's terms (the paper's
-                randomisation; depth independent of the term count)
-    'exact'   : U^n = expm(i s n H) as a dense gate (small lattices; validation)
+Gauge invariance. H is decomposed at *plaquette* granularity,
+H = sum_k a_k h_k with h_k in {U_p + U_p^dag, (U_p + U_p^dag)^2, Z_l}. Every
+h_k commutes with every Gauss generator, so each sampled rotation is exactly
+gauge invariant and the filter never leaves the sector of the initial state. A
+single Pauli string of the plaquette expansion does not have this property.
+For the same reason the penalty term is not needed inside the filter, which
+keeps lambda_H (and hence the circuit length) small.
 
-Richardson extrapolation over the Trotter/qDRIFT step count suppresses the
-simulation error, as in the paper.
-
-The guess state is the strong-coupling vacuum |0...0> (all links S^z = +1/2), which
-is gauge invariant (G_j|0> = 0). The structured-Trotter evolution commutes with
-every Gauss generator, so the filtered state stays in the physical sector and the
-filter selects the gauge-invariant ground state even though U carries no penalty.
+Classical emulation works in the gauge-invariant sector with the two ancilla
+branches stored separately, so it is cheap even for 30+ link qubits.
+build_circuit() emits the actual (N_q + 1)-qubit Qiskit circuit; the test-suite
+checks that both agree.
 """
 
+from __future__ import annotations
+
 import numpy as np
-from scipy.linalg import expm
-from scipy.sparse.linalg import eigsh
+import scipy.sparse as sp
+from scipy.special import erfc
 
-from qiskit import QuantumCircuit, transpile
-from qiskit.circuit.library import UnitaryGate, PauliEvolutionGate, StatePreparation
-from qiskit.quantum_info import SparsePauliOp
+from qiskit import QuantumCircuit
 
-from QuantumFields.gauge_field import QuantumLinkModel
-from circuit import StructuredTrotter
+from circuit import (append_flippability_rotation, append_pauli_rotation,
+                     append_plaquette_rotation, circuit_resources)
+from QuantumFields.gauge_field import QuantumLinkModel, field_signs
+from sector import GaugeSector
 
 
-def richardson_extrapolate(hs, ys):
-    """Lagrange extrapolation of ys(hs) to h = 0."""
+# ---------------------------------------------------------------------------
+# Generalised quantum signal processing
+# ---------------------------------------------------------------------------
+
+def gqsp_rotation(theta: float, phi: float, lam: float = 0.0) -> np.ndarray:
+    """R(theta, phi, lambda) of Motlagh & Wiebe, a generic SU(2) element up to phase."""
+    return np.array(
+        [[np.exp(1j * (lam + phi)) * np.cos(theta), np.exp(1j * phi) * np.sin(theta)],
+         [np.exp(1j * lam) * np.sin(theta), -np.cos(theta)]])
+
+
+def complementary_polynomial(P: np.ndarray) -> np.ndarray:
+    """Q with |P(z)|^2 + |Q(z)|^2 = 1 on |z| = 1 and deg Q = deg P.
+
+    FFT construction of Berntson & Suenderhauf (2025): Q = exp(Pi[log(1-|P|^2)]),
+    where Pi keeps the analytic half of the Fourier series. Requires |P| < 1.
+    """
+    d = len(P) - 1
+    N = 2 ** int(np.ceil(np.log2(128 * (d + 1))))
+    z = np.exp(2j * np.pi * np.arange(N) / N)
+    Pz = np.polyval(P[::-1], z)
+    if np.max(np.abs(Pz)) >= 1.0:
+        raise ValueError("GQSP needs |P(z)| < 1 on the unit circle")
+    c = np.fft.fft(np.log(1.0 - np.abs(Pz) ** 2)) / N
+    analytic = np.zeros(N, dtype=complex)
+    analytic[0] = c[0] / 2.0
+    analytic[1:N // 2] = c[1:N // 2]
+    Qz = np.exp(np.fft.ifft(analytic) * N)
+    outer = (np.fft.fft(Qz) / N)[:d + 1]
+    # The outer function has a vanishing leading coefficient, which makes layer
+    # stripping divide by ~1e-10 and lose all accuracy for step-like filters.
+    # Its reciprocal polynomial z^d conj(Q(1/conj z)) has the same modulus on the
+    # circle and an O(1) leading coefficient; angles then come out to 1e-14.
+    return np.conj(outer[::-1])
+
+
+def gqsp_angles(P: np.ndarray, Q: np.ndarray = None):
+    """Rotation angles (theta_k, phi_k, lambda) implementing P by layer stripping."""
+    P = np.asarray(P, dtype=complex)
+    Q = complementary_polynomial(P) if Q is None else np.asarray(Q, dtype=complex)
+    S = np.array([P, Q])
+    d = len(P) - 1
+    theta, phi, lam = np.zeros(d + 1), np.zeros(d + 1), 0.0
+    for k in range(d, -1, -1):
+        a, b = S[0, k], S[1, k]
+        theta[k] = np.arctan2(abs(b), abs(a))
+        if abs(a) > 1e-300 and abs(b) > 1e-300:
+            phi[k] = np.angle(a) - np.angle(b)
+        elif abs(b) <= 1e-300:
+            phi[k] = np.angle(a)
+        else:
+            phi[k] = -np.angle(b)
+        if k == 0:
+            lam = np.angle(b) if abs(b) > 1e-300 else 0.0
+        else:
+            S = gqsp_rotation(theta[k], phi[k]).conj().T @ S
+            S = np.array([S[0, 1:k + 1], S[1, 0:k]])
+    return theta, phi, lam
+
+
+def gqsp_response(theta, phi, lam, z: complex) -> complex:
+    """<0| prod_k R_k diag(z, 1) ... R_0 |0>: the polynomial the angles realise."""
+    M = gqsp_rotation(theta[0], phi[0], lam)
+    A = np.diag([z, 1.0])
+    for k in range(1, len(theta)):
+        M = gqsp_rotation(theta[k], phi[k]) @ A @ M
+    return M[0, 0]
+
+
+# ---------------------------------------------------------------------------
+# Spectral filters as Fourier series in theta = t0 * (E - E_c)
+# ---------------------------------------------------------------------------
+
+def fourier_filter(kind: str, D: int, centre: float, width: float,
+                   headroom: float = 0.02) -> np.ndarray:
+    """Coefficients c_{-D..D} of a degree-D Fourier filter on theta in (-pi, pi].
+
+    kind="step"      smooth indicator of theta < centre (shifted-sign filter of
+                     the draft); `width` is the erf smoothing scale. The second,
+                     unavoidable edge of the periodic function sits at theta = pi,
+                     outside the rescaled spectrum.
+    kind="gaussian"  exp(-(theta - centre)^2 / (2 width^2)), needs E0 itself.
+    The result is rescaled so that max |F| = 1 - headroom.
+    """
+    N = 2 ** int(np.ceil(np.log2(64 * (D + 1))))
+    theta = -np.pi + 2 * np.pi * np.arange(N) / N
+    if kind == "step":
+        lower = 0.5 * erfc(-(theta + np.pi - 3 * width) / (np.sqrt(2) * width))
+        upper = 0.5 * erfc((theta - centre) / (np.sqrt(2) * width))
+        target = lower * upper
+    elif kind == "gaussian":
+        delta = (theta - centre + np.pi) % (2 * np.pi) - np.pi
+        target = np.exp(-delta ** 2 / (2 * width ** 2))
+    else:
+        raise ValueError(f"unknown filter kind {kind!r}")
+    ks = np.arange(-D, D + 1)
+    # c_k = (1/N) sum_n f(theta_n) exp(-i k theta_n), theta_n = -pi + 2 pi n / N
+    spectrum = np.fft.fft(target) / N
+    coeffs = spectrum[ks % N] * np.exp(1j * np.pi * ks)
+    dense = np.exp(1j * np.outer(theta, ks)) @ coeffs
+    return coeffs * (1.0 - headroom) / np.max(np.abs(dense))
+
+
+def filter_degree(width: float, truncation: float = 1e-3) -> int:
+    """Smallest D with Gaussian-tail truncation error below `truncation`."""
+    return int(np.ceil(np.sqrt(2.0 * np.log(1.0 / truncation)) / width))
+
+
+def richardson_extrapolate(hs, ys) -> float:
+    """Lagrange extrapolation of y(h) to h = 0."""
     total = 0.0
     for i in range(len(hs)):
-        Li = 1.0
+        weight = 1.0
         for j in range(len(hs)):
             if j != i:
-                Li *= (0.0 - hs[j]) / (hs[i] - hs[j])
-        total += ys[i] * Li
-    return total
+                weight *= (0.0 - hs[j]) / (hs[i] - hs[j])
+        total += ys[i] * weight
+    return float(total)
 
+
+# ---------------------------------------------------------------------------
+# RQSVT ground-state preparation
+# ---------------------------------------------------------------------------
 
 class RQSVTGroundState:
-    """LCU realisation of the RQSVT ground-state filter for the pure-gauge U(1) QLM."""
+    """Ground-state filter for the pure-gauge QLM with one ancilla qubit.
 
-    def __init__(self, lattice, g=6.0, J=2.0, eta_max=2.6, resolve=2.5, max_degree=16):
+    The reference spectrum (E0 and the in-sector gap) comes from sector ED; this
+    is the prior knowledge assumed by Wang et al. and would be replaced by a
+    binary search over the filter threshold on hardware.
+    """
+
+    def __init__(self, lattice, g=0.0, J=1.0, rk=0.0, field_pattern="uniform",
+                 plates="free", plate_charges=None, filter_kind="step",
+                 sharpness: float = 3.0, truncation: float = 1e-3,
+                 degree: int = None, spectrum_margin: float = 0.9,
+                 initial_state="max_flippable"):
         self.lattice = lattice
         self.n = lattice.n_qubits
-        self.g, self.J = g, J
+        self.g, self.J, self.rk = float(g), float(J), float(rk)
+        self.field_pattern = field_pattern
+        self.filter_kind = filter_kind
+        self.model = QuantumLinkModel(lattice, g=g, J=J, rk=rk,
+                                      field_pattern=field_pattern, plates=plates,
+                                      plate_charges=plate_charges)
 
-        model = QuantumLinkModel(lattice, g=g, J=J)
-        self.H_phys = (model.build_electric_term()
-                       + model.build_magnetic_term()).simplify()
-        self._H_sparse = self.H_phys.to_matrix(sparse=True)
+        # --- classical reference in the gauge sector ---------------------
+        full_sector = GaugeSector(lattice, plates=plates, plate_charges=plate_charges)
+        ref = full_sector.ground_state(g=g, J=J, rk=rk, field_pattern=field_pattern)
+        self.support = ref['support']              # plate-charge sector of the GS
+        self.basis = full_sector.basis[self.support]
+        self.dim = len(self.basis)
+        self.E0, self.gap = ref['energy'], ref['gap']
+        self.gs_exact = ref['state'][self.support]
+        self.plate_charges = ref['plate_charges']
+        self._H = ref['hamiltonian'][self.support][:, self.support].tocsr()
 
-        # Reference spectrum (the paper's assumed knowledge of E0 and the gap Delta).
-        H_pen = QuantumLinkModel(lattice, g=g, J=J,
-                                 gauss_penalty=200.0).build_hamiltonian()
-        evals, evecs = eigsh(H_pen.to_matrix(sparse=True), k=2, which='SA')
-        self.E0, self.E1 = float(evals[0]), float(evals[1])
-        self.gs_exact = evecs[:, 0]
-        e_hi = float(eigsh(self._H_sparse, k=1, which='LA', return_eigenvectors=False)[0])
-        e_lo = float(eigsh(self._H_sparse, k=1, which='SA', return_eigenvectors=False)[0])
+        # --- term decomposition H = sum_k a_k h_k (plaquette granularity) --
+        self.terms = []                            # (kind, index, coefficient)
+        self._term_ops = {}
+        for p in range(lattice.n_plaquettes):
+            if self.J != 0.0:
+                self.terms.append(('plaq', p, self.J))
+            if self.rk != 0.0:
+                self.terms.append(('flip', p, self.rk))
+            hp = full_sector.plaquette_matrix(p)[self.support][:, self.support].tocsr()
+            self._term_ops[('plaq', p)] = hp
+            self._term_ops[('flip', p)] = full_sector.flippable(p)[self.support]
+        if self.g != 0.0:
+            signs = field_signs(lattice, field_pattern)
+            for q in range(self.n):
+                self.terms.append(('z', q, -0.5 * self.g * signs[q]))
+                self._term_ops[('z', q)] = 2.0 * full_sector.sz_diagonal(q)[self.support]
+        self.lambda_H = float(sum(abs(a) for _, _, a in self.terms))
+        self._dense_cache = {}
 
-        # Map the spectrum into eigenphases in (-pi, pi) (no aliasing): U = e^{i scale H}.
-        self.scale = eta_max / max(abs(e_lo), abs(e_hi), 1e-9)
-        self.eta0 = self.scale * self.E0
-        eta_gap = self.scale * abs(self.E1 - self.E0)
-
-        # Gaussian filter: width sigma < eta_gap resolves the gap; truncate at ~3 sigma.
-        self.sigma = eta_gap / resolve
-        self.degree = int(np.clip(np.ceil(3.0 / self.sigma), 2, max_degree))
-        ns = np.arange(-self.degree, self.degree + 1)
-        self.coeff_mag = np.exp(-(ns * self.sigma) ** 2 / 2.0)          # |c_n|
-        self.n_anc = int(np.ceil(np.log2(2 * self.degree + 1)))
-
-    # ---- controlled evolution U^power = e^{i scale*power*H} ----
-
-    def _append_controlled_power(self, qc, ctrl, sys, power, backend,
-                                 n_trotter, qdrift_steps, rng):
-        """Append controlled-U^power (control = |1>) onto qc.
-
-        For 'exact' we build the controlled unitary as an explicit block-diagonal
-        matrix and append it as a single `unitary` instruction, which Aer applies
-        natively. This deliberately avoids Gate.control() on a dense UnitaryGate:
-        that path calls Quantum Shannon Decomposition to synthesise the n-qubit
-        unitary into ~4^n elementary gates (and verifies it by einsum), which is
-        intractable beyond a handful of qubits.
-        """
-        if backend == 'exact':
-            dim = 2 ** self.n
-            U = expm(1j * self.scale * power * self.H_phys.to_matrix())
-            cmat = np.eye(2 * dim, dtype=complex)
-            cmat[dim:, dim:] = U                          # control (MSB) = |1> -> apply U
-            qc.unitary(cmat, list(sys) + [ctrl], label=f"cU^{power}")
+        # --- spectral rescaling and filter ----------------------------------
+        self.t0 = spectrum_margin * np.pi / self.lambda_H
+        gap_theta = self.t0 * self.gap
+        if filter_kind == "step":
+            self.width = gap_theta / (2.0 * sharpness)
+            centre = self.t0 * (self.E0 + 0.5 * self.gap)
         else:
-            gate = self._evolution_gate(power, backend, n_trotter, qdrift_steps, rng)
-            qc.append(gate.control(1), [ctrl] + list(sys))
+            self.width = gap_theta / sharpness
+            centre = self.t0 * self.E0
+        self.D = int(degree) if degree is not None else filter_degree(self.width, truncation)
+        self.coeffs = fourier_filter(filter_kind, self.D, centre, self.width)
+        self.theta, self.phi, self.lam = gqsp_angles(self.coeffs)
+        self.n_signal = 2 * self.D                 # signal operators in the circuit
 
-    def _evolution_gate(self, power, backend, n_trotter, qdrift_steps, rng):
-        qc = QuantumCircuit(self.n, name=f"U^{power}")
-        if backend == 'trotter':
-            dt = -self.scale / n_trotter                       # negative dt -> e^{+iH|dt|}
-            step = StructuredTrotter(self.lattice, g=self.g, J=self.J, dt=dt).build_step()
-            for _ in range(power * n_trotter):
-                for inst in step.data:
-                    if inst.operation.name != 'barrier':
-                        qc.append(inst.operation, inst.qubits)
-        elif backend == 'qdrift':
-            terms = self._qdrift_terms()
-            lam = sum(w for w, _ in terms)
-            probs = [w / lam for w, _ in terms]
-            steps = power * qdrift_steps
-            tick = self.scale * power * lam / steps
-            for _ in range(steps):
-                _, (pauli, sign) = terms[rng.choice(len(terms), p=probs)]
-                op = SparsePauliOp([pauli], coeffs=[1.0])
-                qc.append(PauliEvolutionGate(op, time=-sign * tick), range(self.n))
+        self.psi0 = self._initial_state(initial_state)
+        self.initial_overlap = float(abs(np.vdot(self.gs_exact, self.psi0)) ** 2)
+
+    # ---- initial state -------------------------------------------------------
+
+    def _initial_state(self, spec) -> np.ndarray:
+        """A computational-basis (product) state inside the ground-state sector."""
+        if isinstance(spec, (int, np.integer)):
+            k = int(np.searchsorted(self.basis, spec))
+            if k >= self.dim or self.basis[k] != spec:
+                raise ValueError("initial configuration is outside the sector")
+        elif spec == "best_basis":                 # oracle choice, for comparison
+            k = int(np.argmax(np.abs(self.gs_exact)))
+        elif spec == "max_flippable":              # needs no knowledge of the GS
+            count = sum(self._term_ops[('flip', p)]
+                        for p in range(self.lattice.n_plaquettes))
+            best = np.nonzero(count == count.max())[0]
+            energy = self._H.diagonal()[best]
+            k = int(best[np.argmin(energy)])
         else:
-            raise ValueError(f"unknown backend {backend!r}")
-        return qc.to_gate(label=f"U^{power}")
+            raise ValueError(f"unknown initial state {spec!r}")
+        self.initial_bits = int(self.basis[k])
+        psi = np.zeros(self.dim, dtype=complex)
+        psi[k] = 1.0
+        return psi
 
-    def _qdrift_terms(self):
-        terms = []
-        for pauli, coeff in zip(self.H_phys.paulis, self.H_phys.coeffs):
-            w = abs(coeff.real)
-            if w > 1e-12:
-                terms.append((w, (pauli, float(np.sign(coeff.real)))))
-        return terms
+    def filter_response(self, energies) -> np.ndarray:
+        """F(E) realised by the GQSP angles (evaluated as a scalar)."""
+        ks = np.arange(-self.D, self.D + 1)
+        return np.exp(1j * self.t0 * np.outer(np.atleast_1d(energies), ks)) @ self.coeffs
 
-    # ---- LCU PREPARE / SELECT / UNPREPARE ----
+    # ---- classical emulation --------------------------------------------------
 
-    def _prepare_state(self):
-        """Amplitude vector encoding sqrt(|c_{m-d}|/lambda) on |m>, m = 0..2d."""
-        amps = np.zeros(2 ** self.n_anc, dtype=complex)
-        amps[:2 * self.degree + 1] = np.sqrt(self.coeff_mag)
-        return amps / np.linalg.norm(amps)
+    def _apply_term(self, branches, key, angle):
+        """exp(i angle Z (x) h_k): +angle on the |0> branch, -angle on |1>."""
+        kind = key[0]
+        op = self._term_ops[key]
+        out = []
+        for psi, a in zip(branches, (angle, -angle)):
+            if kind == 'plaq':                     # h^3 = h
+                h_psi = op @ psi
+                out.append(psi + 1j * np.sin(a) * h_psi
+                           + (np.cos(a) - 1.0) * (op @ h_psi))
+            else:                                  # diagonal term
+                out.append(np.exp(1j * a * op) * psi)
+        return out
 
-    def build_circuit(self, backend='trotter', n_trotter=2, qdrift_steps=200, seed=0):
-        """LCU filter circuit: system qubits 0..n-1, ancilla register n..n+a-1."""
+    def _signal_exact(self):
+        w, v = np.linalg.eigh(self._H.toarray())
+        phases = np.exp(0.5j * self.t0 * w)
+        return (v * phases) @ v.conj().T, (v * phases.conj()) @ v.conj().T
+
+    def _trotter_sequence(self, n_steps):
+        """Term order of one structured first-order step, scaled by 1/n_steps."""
+        seq = []
+        diag = [(k, i, a) for (k, i, a) in self.terms if k != 'plaq']
+        for kind, idx, a in diag:
+            seq.append(((kind, idx), 0.5 * a / n_steps))
+        anchors = self.lattice.plaquette_anchors()
+        for colour in range(self.lattice.n_plaquette_colours):
+            for p, (i, j) in enumerate(anchors):
+                if self.lattice.plaquette_colour(i, j) == colour and self.J != 0.0:
+                    seq.append((('plaq', p), self.J / n_steps))
+        for kind, idx, a in diag:
+            seq.append(((kind, idx), 0.5 * a / n_steps))
+        return seq * n_steps
+
+    def _qdrift_sequence(self, n_samples, rng):
+        probs = np.array([abs(a) for _, _, a in self.terms]) / self.lambda_H
+        picks = rng.choice(len(self.terms), size=n_samples, p=probs)
+        return [((self.terms[k][0], self.terms[k][1]),
+                 np.sign(self.terms[k][2]) * self.lambda_H / n_samples) for k in picks]
+
+    # Dense fast path: in small sectors every term rotation is a precomputed
+    # dim x dim matrix, a whole Trotter step collapses to one matrix per branch,
+    # and a qDRIFT sample costs two small mat-vecs.
+    DENSE_DIM = 400
+
+    def _dense_term(self, key, angle):
+        """(exp(+i angle h_k), exp(-i angle h_k)) as dense matrices."""
+        op = self._term_ops[key]
+        if key[0] == 'plaq':
+            h = op.toarray()
+            h2 = h @ h
+            eye = np.eye(self.dim)
+            return (eye + 1j * np.sin(angle) * h + (np.cos(angle) - 1.0) * h2,
+                    eye - 1j * np.sin(angle) * h + (np.cos(angle) - 1.0) * h2)
+        phase = np.exp(1j * angle * op)
+        return np.diag(phase), np.diag(phase.conj())
+
+    def _dense_trotter_signal(self, n_steps):
+        key = ('trotter', n_steps)
+        if key not in self._dense_cache:
+            plus = minus = np.eye(self.dim, dtype=complex)
+            for term, weight in self._trotter_sequence(n_steps)[:len(self._trotter_sequence(1))]:
+                up, um = self._dense_term(term, 0.5 * self.t0 * weight)
+                plus, minus = up @ plus, um @ minus
+            self._dense_cache[key] = (np.linalg.matrix_power(plus, n_steps),
+                                      np.linalg.matrix_power(minus, n_steps))
+        return self._dense_cache[key]
+
+    def _dense_qdrift_terms(self, n_samples):
+        key = ('qdrift', n_samples)
+        if key not in self._dense_cache:
+            angle = 0.5 * self.t0 * self.lambda_H / n_samples
+            mats = [self._dense_term((k, i), np.sign(a) * angle) for k, i, a in self.terms]
+            self._dense_cache[key] = (np.array([m[0] for m in mats]),
+                                      np.array([m[1] for m in mats]))
+        return self._dense_cache[key]
+
+    def run(self, method="exact", n_steps=1, n_samples=20, seed=0) -> dict:
+        """Emulate the circuit once; returns the unnormalised filtered state."""
         rng = np.random.default_rng(seed)
-        sys = list(range(self.n))
-        anc = list(range(self.n, self.n + self.n_anc))
-        qc = QuantumCircuit(self.n + self.n_anc)
+        dense = self.dim <= self.DENSE_DIM
+        probs = np.array([abs(a) for _, _, a in self.terms]) / self.lambda_H
+        if method == "exact":
+            Wp, Wm = self._signal_exact()
+        elif method == "trotter" and dense:
+            Wp, Wm = self._dense_trotter_signal(n_steps)
+        elif method == "qdrift" and dense:
+            Up, Um = self._dense_qdrift_terms(n_samples)
+        b0 = gqsp_rotation(self.theta[0], self.phi[0], self.lam)[:, 0]
+        x0, x1 = b0[0] * self.psi0, b0[1] * self.psi0
+        n_rotations = 0
+        per_step = len(self._trotter_sequence(1))
+        for k in range(1, self.n_signal + 1):
+            if method == "exact" or (method == "trotter" and dense):
+                x0, x1 = Wp @ x0, Wm @ x1
+                n_rotations += 0 if method == "exact" else per_step * n_steps
+            elif method == "qdrift" and dense:
+                # same draw as _qdrift_sequence, so circuit and emulator agree
+                for pick in rng.choice(len(self.terms), size=n_samples, p=probs):
+                    x0, x1 = Up[pick] @ x0, Um[pick] @ x1
+                n_rotations += n_samples
+            else:
+                seq = (self._trotter_sequence(n_steps) if method == "trotter"
+                       else self._qdrift_sequence(n_samples, rng))
+                branches = [x0, x1]
+                for key, weight in seq:
+                    branches = self._apply_term(branches, key, 0.5 * self.t0 * weight)
+                x0, x1 = branches
+                n_rotations += len(seq)
+            R = gqsp_rotation(self.theta[k], self.phi[k])
+            x0, x1 = R[0, 0] * x0 + R[0, 1] * x1, R[1, 0] * x0 + R[1, 1] * x1
+        phi = x0                                   # ancilla post-selected on |0>
+        norm2 = float(np.vdot(phi, phi).real)
+        numerator = float(np.vdot(phi, self._H @ phi).real)
+        return {'state': phi, 'success_prob': norm2, 'numerator': numerator,
+                'energy': numerator / norm2,
+                'overlap': float(abs(np.vdot(self.gs_exact, phi)) ** 2) / norm2,
+                'term_rotations': n_rotations}
 
-        prep = StatePreparation(self._prepare_state())
-        qc.append(prep, anc)
-        # phase e^{-i m eta0} on |m> = product of single-qubit phases on the register
-        for j, a in enumerate(anc):
-            qc.p(-(2 ** j) * self.eta0, a)
-        # SELECT: bit j controls U^{2^j}
-        for j, a in enumerate(anc):
-            self._append_controlled_power(qc, a, sys, 2 ** j, backend,
-                                          n_trotter, qdrift_steps, rng)
-        qc.append(prep.inverse(), anc)
+    def estimate_energy(self, method="trotter", schedule=(1, 2, 4),
+                        n_circuits=1, seed=0) -> dict:
+        """<H> at each step count in `schedule`, Richardson-extrapolated to 1/n -> 0.
+
+        For qDRIFT the numerator <phi|H|phi> and denominator <phi|phi> are
+        averaged separately over `n_circuits` random circuits, which is what the
+        post-selected measurement estimates on hardware.
+        """
+        hs, energies, runs = [], [], []
+        for n in schedule:
+            num = den = ov = 0.0
+            reps = n_circuits if method == "qdrift" else 1
+            for r in range(reps):
+                res = self.run(method, n_steps=n, n_samples=n,
+                               seed=seed + 1000 * n + r)
+                num += res['numerator']
+                den += res['success_prob']
+                ov += res['overlap'] * res['success_prob']
+            hs.append(1.0 / n)
+            energies.append(num / den)
+            runs.append({'n': n, 'energy': num / den, 'overlap': ov / den,
+                         'success_prob': den / reps})
+        extrapolated = (richardson_extrapolate(hs, energies)
+                        if len(hs) > 1 else energies[0])
+        return {'energy_richardson': extrapolated, 'runs': runs,
+                'E0_exact': self.E0, 'error': extrapolated - self.E0}
+
+    # ---- Qiskit circuit --------------------------------------------------------
+
+    def _append_term(self, qc, key, angle, ancilla):
+        """exp(i angle Z_anc (x) h_k) as Pauli rotations."""
+        kind, idx = key
+        if kind == 'plaq':
+            append_plaquette_rotation(qc, -angle, self.lattice.get_plaquettes()[idx],
+                                      ancilla=ancilla)
+        elif kind == 'flip':
+            append_flippability_rotation(qc, -angle, self.lattice.get_plaquettes()[idx],
+                                         ancilla=ancilla)
+        else:
+            append_pauli_rotation(qc, -angle, [idx, ancilla], ['Z', 'Z'])
+
+    def build_circuit(self, method="qdrift", n_steps=1, n_samples=20, seed=0,
+                      max_signal: int = None) -> QuantumCircuit:
+        """(N_q + 1)-qubit circuit; the ancilla is qubit N_q and starts in |0>.
+
+        `max_signal` truncates the circuit after that many signal operators, for
+        resource counting on large lattices.
+        """
+        if method == "exact":
+            raise ValueError("the exact signal operator has no gate decomposition")
+        rng = np.random.default_rng(seed)
+        anc = self.n
+        qc = QuantumCircuit(self.n + 1)
+        for q in range(self.n):                    # product initial state
+            if (self.initial_bits >> q) & 1:
+                qc.x(q)
+        qc.unitary(gqsp_rotation(self.theta[0], self.phi[0], self.lam), [anc], label="R0")
+        n_signal = self.n_signal if max_signal is None else min(max_signal, self.n_signal)
+        for k in range(1, n_signal + 1):
+            seq = (self._trotter_sequence(n_steps) if method == "trotter"
+                   else self._qdrift_sequence(n_samples, rng))
+            for key, weight in seq:
+                self._append_term(qc, key, 0.5 * self.t0 * weight, anc)
+            qc.unitary(gqsp_rotation(self.theta[k], self.phi[k]), [anc], label=f"R{k}")
         return qc
 
-    # ---- run on Aer + read out ----
+    def resources(self, method="qdrift", n_steps=1, n_samples=20, seed=0,
+                  probe_signal: int = 4) -> dict:
+        """Gate counts of the full circuit, extrapolated from `probe_signal`
+        transpiled signal operators (the circuit is periodic in structure)."""
+        probe = min(probe_signal, self.n_signal)
+        res = circuit_resources(self.build_circuit(method, n_steps, n_samples, seed,
+                                                   max_signal=probe))
+        scale = self.n_signal / probe
+        return {'qubits': self.n + 1,
+                'signal_operators': self.n_signal,
+                'two_qubit_gates': int(round(res['two_qubit_gates'] * scale)),
+                'one_qubit_gates': int(round(res['one_qubit_gates'] * scale)),
+                'two_qubit_depth': int(round(res['two_qubit_depth'] * scale)),
+                'evolution_time': self.D * self.t0,
+                'lambda_H': self.lambda_H}
 
-    def prepare(self, aer_backend, backend='trotter', n_trotter=2,
-                qdrift_steps=200, seed=0):
-        """Run on Aer, post-select ancilla=|0...0>, return prepared state + diagnostics."""
-        import qiskit_aer  # noqa: F401  -- registers .save_statevector() on QuantumCircuit
-        qc = self.build_circuit(backend, n_trotter, qdrift_steps, seed)
-        qc.save_statevector()
-        sv = np.asarray(aer_backend.run(transpile(qc, aer_backend, optimization_level=0))
-                        .result().get_statevector())
-
-        psi = sv[:2 ** self.n]                              # ancilla=|0...0> block (ancilla = MSBs)
-        success = float(np.vdot(psi, psi).real)
-        if success < 1e-12:
-            return {'energy': float('nan'), 'overlap': 0.0, 'success_prob': success}
-        psi = psi / np.sqrt(success)
-        return {'state': psi,
-                'energy': float((np.conj(psi) @ (self._H_sparse @ psi)).real),
-                'overlap': float(abs(np.vdot(self.gs_exact, psi)) ** 2),
-                'success_prob': success}
-
-    def estimate_energy(self, aer_backend, backend='trotter',
-                        n_trotter_list=(1, 2, 3), qdrift_steps=200, seed=0):
-        """Richardson-extrapolate <H> over the Trotter/qDRIFT step count."""
-        hs, energies, runs = [], [], []
-        for n in n_trotter_list:
-            res = self.prepare(aer_backend, backend, n_trotter=n,
-                               qdrift_steps=qdrift_steps * n, seed=seed)
-            hs.append(1.0 / n)
-            energies.append(res['energy'])
-            runs.append((n, res))
-        extra = richardson_extrapolate(hs, energies) if len(hs) > 1 else energies[0]
-        return {'energy_richardson': extra, 'runs': runs, 'E0_exact': self.E0}
-
-    def guess_energy(self):
-        """<0...0| H |0...0> and its ground-state overlap (the unfiltered baseline)."""
-        psi0 = np.zeros(2 ** self.n, dtype=complex)
-        psi0[0] = 1.0
-        return (float((np.conj(psi0) @ (self._H_sparse @ psi0)).real),
-                float(abs(np.vdot(self.gs_exact, psi0)) ** 2))
-
-
-if __name__ == "__main__":
-    # Filter-coefficient sanity check (no qiskit needed).
-    for sigma in (0.10, 0.05):
-        ns = np.arange(-40, 41)
-        c = np.exp(-(ns * sigma) ** 2 / 2)
-        f = lambda d: abs(np.sum(c * np.exp(1j * ns * d)))
-        print(f"sigma={sigma}: |f(0)|={f(0)/f(0):.3f}  |f(sigma)|={f(sigma)/f(0):.3f}  "
-              f"|f(3sigma)|={f(3*sigma)/f(0):.3f}")
+    def summary(self) -> dict:
+        return {'qubits': self.n + 1, 'sector_dim': self.dim, 'E0': self.E0,
+                'gap': self.gap, 'lambda_H': self.lambda_H, 't0': self.t0,
+                'filter': self.filter_kind, 'fourier_degree': self.D,
+                'signal_operators': self.n_signal,
+                'initial_overlap': self.initial_overlap,
+                'initial_bits': self.initial_bits}
