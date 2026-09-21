@@ -69,8 +69,6 @@ class CasimirModel:
         """E0(d) and gap for every separation whose sector is small enough."""
         ds, E0, gaps = [], [], []
         for d in range(1, d_max + 1):
-            if W * (2 * d + 1) > 62:
-                break
             try:
                 sector = self.sector(W, d + 1, plates)
             except MemoryError:
@@ -198,8 +196,6 @@ class CasimirExplorer:
         p = self.params
         plates = self.model.resolve_plates(p['W'], p['plates'])
         H = p['d'] + 1
-        if p['W'] * (2 * H - 1) > 62:
-            raise MemoryError("more than 62 link qubits")
         sector, gs = self.model.ground(p['W'], H, plates, p['g'], p['J'], p['rk'],
                                        p['pattern'])
         return plates, sector, gs

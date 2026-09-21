@@ -35,7 +35,12 @@ odd W (the checkerboard is invalid on an odd-width cylinder).
 `GaugeSector(lattice, plates)` enumerates only the gauge-invariant basis states
 (row by row: horizontal links free, vertical links fixed by Gauss's law) and
 builds H as a sparse matrix in that basis. No penalty, no 2^N_q vectors.
-3x3: 32768 -> 1792 -> 21 states. Works to 62 link qubits.
+3x3: 32768 -> 1792 -> 21 states. There is no qubit limit (labels are stored in
+62-bit words); the limit is the sector dimension. `count_states(lattice, plates)`
+returns it exactly and instantly, and `GaugeSector(..., max_dim=...)` refuses to
+enumerate anything larger than `max_dim` (default 6 million; raise it on a big
+machine). Fixed staggered plates: 6x6 = 7.8e5, 6x7 = 1.1e7, 8x5 = 1.5e6,
+8x6 = 5.0e7, 8x7 = 1.7e9, 8x8 = 5.6e10 states.
 
     from lattice import LatticeGrid; from sector import GaugeSector
     s = GaugeSector(LatticeGrid(4, 4), plates="fixed")
@@ -94,7 +99,7 @@ with ancilla post-selection only and with additional Gauss-law post-selection.
     python experiments.py all      # rk-scan, filter-scaling, noise -> results/*.json, *.png (~2 min)
     python make_figures.py         # thesis figures from summary.json
     python main.py --gui           # explorer window
-    python -m pytest -q            # 41 tests
+    python -m pytest -q            # 44 tests
     LEAN=lean proofs/check.sh      # Lean 4 proofs
 All standard parameters live in `config.py`.
 
@@ -169,7 +174,9 @@ plot overlap against signal operators. Goal: the cheapest filter that reaches
 overlap 0.999.
 
 **R9. Finite-width extrapolation (open).**
-E0(d)/W at fixed d for W = 2, 4, 6, 8 (W = 8 reaches d = 3). Plot against 1/W^2.
+E0(d)/W at fixed d for W = 2, 4, 6, 8 (W = 8 reaches d = 4 with the default
+`max_dim`, d = 5 with `max_dim=6e7` and about 20 GB; 8x8 is out of reach of
+any exact method). Plot against 1/W^2.
 This is the honest route to a 2+1D statement and also shows directly why W = 3
 cannot test it.
 

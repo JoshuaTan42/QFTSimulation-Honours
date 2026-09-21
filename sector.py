@@ -8,13 +8,18 @@ subspace
 
   * gives the classical reference to machine precision with no penalty term
     (so no penalty-induced conditioning problems),
-  * reaches separations d = H - 1 far beyond full-space sparse ED
-    (N_q up to 62 link qubits; the limit is the int64 basis label),
+  * reaches separations d = H - 1 far beyond full-space sparse ED. Basis labels
+    are stored in 62-bit words, as many as needed, so the number of link qubits
+    is unlimited; what limits the method is the sector dimension, which
+    `count_states` returns exactly (transfer-matrix count) before anything is
+    enumerated,
   * makes the conserved plate charges explicit, which resolves the ground-state
     degeneracy seen by the penalised Hamiltonian with free plates.
 
-Basis states are integers whose bit q is the state of link qubit q
-(bit 1 = |1> = S^z = -1/2), i.e. exactly the Qiskit statevector index.
+Basis states are bit strings whose bit q is the state of link qubit q
+(bit 1 = |1> = S^z = -1/2), i.e. exactly the Qiskit statevector index. For
+N_q <= 62 they are exposed as the int64 array `basis`; beyond that use
+`label(k)` / `index_of(bits)`, which work with Python integers.
 """
 
 from __future__ import annotations
@@ -25,8 +30,58 @@ from scipy.sparse.linalg import eigsh, expm_multiply
 
 from QuantumFields.gauge_field import GaussLaw, field_signs
 
-MAX_QUBITS = 62
+WORD_BITS = 62                 # link qubits per int64 word of a basis label
 DENSE_LIMIT = 600
+CHUNK = 1 << 22                # states expanded at once during enumeration
+
+
+def count_states(lattice, plates: str = "free", plate_charges: dict = None) -> int:
+    """Exact dimension of the gauge sector by a transfer-matrix count.
+
+    The state passed from row to row is the configuration of the W vertical
+    links below the row; for each of the 2^W horizontal configurations Gauss's
+    law fixes (or forbids) the vertical links above. Cost O(H 4^W), no
+    enumeration, so it answers "does this lattice fit?" instantly.
+    """
+    gauss = GaussLaw(lattice, plates=plates, plate_charges=plate_charges)
+    W, H = lattice.width, lattice.height
+    cfg = np.arange(2 ** W)
+    sz = 0.5 - ((cfg[:, None] >> np.arange(W)[None, :]) & 1)          # (2^W, W)
+    div_h = sz - np.roll(sz, 1, axis=1)                                # S^z_right - S^z_left
+    counts = None                                                      # over v_down configs
+    for j in range(H):
+        q = np.array([gauss.charge(i, j) for i in range(W)])
+        constrained = gauss.is_constrained(0, j)
+        n_cfg = 2 ** W
+        last = j == H - 1
+        new = np.zeros(n_cfg)
+        total = 0.0
+        block = max(1, (1 << 21) // n_cfg)                   # v_down configs per block
+        downs = [None] if j == 0 else range(0, n_cfg, block)
+        for lo in downs:
+            if lo is None:
+                sz_up = q[None, :] - div_h                                     # (h, W)
+                weight = np.ones(n_cfg)
+            else:
+                hi = min(lo + block, n_cfg)
+                if not counts[lo:hi].any():
+                    continue
+                sz_up = (q[None, None, :] - div_h[None, :, :]
+                         + sz[lo:hi, None, :]).reshape(-1, W)
+                weight = np.repeat(counts[lo:hi], n_cfg)
+            if last:
+                ok = np.all(sz_up == 0.0, axis=1) if constrained else slice(None)
+                total += float(weight[ok].sum())
+            elif constrained:
+                ok = np.all(np.abs(sz_up) == 0.5, axis=1)
+                v_up = ((sz_up[ok] < 0).astype(np.int64) << np.arange(W)[None, :]).sum(axis=1)
+                new += np.bincount(v_up, weights=weight[ok], minlength=n_cfg)
+            else:                                                              # free plate
+                new += float(weight.sum())
+        if last:
+            return int(round(total))
+        counts = new
+    raise AssertionError("unreachable")
 
 
 class GaugeSector:
@@ -38,68 +93,135 @@ class GaugeSector:
 
     def __init__(self, lattice, plates: str = "free", plate_charges: dict = None,
                  max_dim: int = 6_000_000):
-        if lattice.n_qubits > MAX_QUBITS:
-            raise ValueError(f"{lattice.n_qubits} link qubits exceed the int64 "
-                             f"basis label limit ({MAX_QUBITS})")
         self.lattice = lattice
         self.gauss = GaussLaw(lattice, plates=plates, plate_charges=plate_charges)
         self.plates = plates
         self.max_dim = max_dim
-        self.basis = self._enumerate()
-        self.dim = len(self.basis)
+        self.n_words = (lattice.n_qubits + WORD_BITS - 1) // WORD_BITS
+        expected = count_states(lattice, plates, plate_charges)
+        if expected > max_dim:
+            raise MemoryError(f"gauge sector has {expected:,} states, above max_dim="
+                              f"{max_dim:,}; pass a larger max_dim if the machine allows "
+                              f"(roughly {(8 * lattice.n_plaquettes + 60) * expected / 1e9:.1f} GB "
+                              f"for the basis, plaquette tables and Hamiltonian)")
+        self._words, self._key, self._u_words = self._enumerate()
+        self.dim = len(self._key)
+        assert self.dim == expected, "enumeration disagrees with the transfer-matrix count"
         self._plaq_cache = None
         self._plaq_mats = {}
         self._HB = None
         self._flip_count = None
 
+    @property
+    def basis(self) -> np.ndarray:
+        """int64 labels (= Qiskit statevector indices); only for N_q <= 62."""
+        if self.n_words > 1:
+            raise ValueError(f"{self.lattice.n_qubits} link qubits do not fit one int64 label; "
+                             "use label(k) and index_of(bits)")
+        return self._words[0]
+
+    def label(self, k: int) -> int:
+        """Basis state k as a Python integer bit string (any number of qubits)."""
+        return sum(int(w[k]) << (WORD_BITS * n) for n, w in enumerate(self._words))
+
+    def index_of(self, bits: int) -> int:
+        """Index of a configuration given as an integer; ValueError if not physical."""
+        mask = (1 << WORD_BITS) - 1
+        words = [np.array([(bits >> (WORD_BITS * n)) & mask], dtype=np.int64)
+                 for n in range(self.n_words)]
+        k = self._lookup(words)[0]
+        if k < 0:
+            raise ValueError("configuration is not in the gauge-invariant sector")
+        return int(k)
+
     # ------------------------------------------------------------------
     # Basis enumeration, row by row
     # ------------------------------------------------------------------
 
-    def _sz(self, states, qubit):
-        return 0.5 - ((states >> qubit) & 1)
+    @staticmethod
+    def _bit(words, qubit):
+        return (words[qubit // WORD_BITS] >> (qubit % WORD_BITS)) & 1
 
-    def _enumerate(self) -> np.ndarray:
+    def _sz(self, words, qubit):
+        return 0.5 - self._bit(words, qubit)
+
+    def _row_patterns(self, first_qubit):
+        """Per-word bit patterns of all 2^W settings of W consecutive link qubits."""
+        W = self.lattice.width
+        choices = np.arange(2 ** W, dtype=np.int64)
+        out = [np.zeros(2 ** W, dtype=np.int64) for _ in range(self.n_words)]
+        for i in range(W):
+            q = first_qubit + i
+            out[q // WORD_BITS] |= ((choices >> i) & 1) << (q % WORD_BITS)
+        return out
+
+    @staticmethod
+    def _expand(words, patterns):
+        return [(w[:, None] | p[None, :]).ravel() for w, p in zip(words, patterns)]
+
+    def _enumerate(self):
+        """Row by row; each row is expanded and filtered in chunks to bound memory."""
         lat = self.lattice
         W, H = lat.width, lat.height
-        states = np.zeros(1, dtype=np.int64)
-        row_choices = np.arange(2 ** W, dtype=np.int64)
+        words = [np.zeros(1, dtype=np.int64) for _ in range(self.n_words)]
 
         for j in range(H):
-            # all configurations of the horizontal links in row j
-            shift = lat.get_horizontal_link_index(0, j)
-            states = (states[:, None] | (row_choices[None, :] << shift)).ravel()
-
+            h_pat = self._row_patterns(lat.get_horizontal_link_index(0, j))
             constrained = self.gauss.is_constrained(0, j)
-            if j == H - 1:
-                if constrained:                       # top plate, fixed charges
-                    ok = np.ones(len(states), dtype=bool)
+            free_up = (j < H - 1) and not constrained
+            v_pat = self._row_patterns(lat.get_vertical_link_index(0, j)) if free_up else None
+            step = max(1, CHUNK >> (W * (2 if free_up else 1)))
+            pieces = [[] for _ in range(self.n_words)]
+            for lo in range(0, len(words[0]), step):
+                chunk = self._expand([w[lo:lo + step] for w in words], h_pat)
+                if free_up:                                   # free bottom plate
+                    chunk = self._expand(chunk, v_pat)
+                elif constrained:
+                    ok = np.ones(len(chunk[0]), dtype=bool)
                     for i in range(W):
-                        div = (self._sz(states, lat.get_horizontal_link_index(i, j))
-                               - self._sz(states, lat.get_horizontal_link_index(i - 1, j))
-                               - self._sz(states, lat.get_vertical_link_index(i, j - 1)))
-                        ok &= (div == self.gauss.charge(i, j))
-                    states = states[ok]
-                break
+                        up = (self.gauss.charge(i, j)
+                              - self._sz(chunk, lat.get_horizontal_link_index(i, j))
+                              + self._sz(chunk, lat.get_horizontal_link_index(i - 1, j)))
+                        if j > 0:
+                            up = up + self._sz(chunk, lat.get_vertical_link_index(i, j - 1))
+                        if j == H - 1:                        # top plate: nothing above
+                            ok &= (up == 0.0)
+                        else:                                 # Gauss's law fixes the up-link
+                            ok &= (np.abs(up) == 0.5)
+                            q = lat.get_vertical_link_index(i, j)
+                            chunk[q // WORD_BITS] |= (up < 0).astype(np.int64) << (q % WORD_BITS)
+                    chunk = [w[ok] for w in chunk]
+                for n in range(self.n_words):
+                    pieces[n].append(chunk[n])
+            words = [np.concatenate(p) for p in pieces]
 
-            if not constrained:                       # free bottom plate
-                shift = lat.get_vertical_link_index(0, j)
-                states = (states[:, None] | (row_choices[None, :] << shift)).ravel()
-            else:                                     # Gauss's law fixes the up-links
-                ok = np.ones(len(states), dtype=bool)
-                add = np.zeros(len(states), dtype=np.int64)
-                for i in range(W):
-                    sz_up = (self.gauss.charge(i, j)
-                             - self._sz(states, lat.get_horizontal_link_index(i, j))
-                             + self._sz(states, lat.get_horizontal_link_index(i - 1, j)))
-                    if j > 0:
-                        sz_up = sz_up + self._sz(states, lat.get_vertical_link_index(i, j - 1))
-                    ok &= (np.abs(sz_up) == 0.5)
-                    add |= (sz_up < 0).astype(np.int64) << lat.get_vertical_link_index(i, j)
-                states = (states | add)[ok]
-            if len(states) > self.max_dim:
-                raise MemoryError(f"sector larger than max_dim={self.max_dim}")
-        return np.sort(states)
+        # sort key: the label itself (one word), else a composite rank of the words
+        if self.n_words == 1:
+            key, uniques = words[0], None
+        else:
+            uniques = [np.unique(w) for w in words]
+            key = np.zeros(len(words[0]), dtype=np.int64)
+            for n in reversed(range(self.n_words)):
+                key = key * len(uniques[n]) + np.searchsorted(uniques[n], words[n])
+        order = np.argsort(key, kind="stable")
+        return [w[order] for w in words], key[order], uniques
+
+    def _lookup(self, words) -> np.ndarray:
+        """Indices of the given labels in the basis; -1 where absent."""
+        if self.n_words == 1:
+            key = words[0]
+            valid = np.ones(len(key), dtype=bool)
+        else:
+            key = np.zeros(len(words[0]), dtype=np.int64)
+            valid = np.ones(len(words[0]), dtype=bool)
+            for n in reversed(range(self.n_words)):
+                u = self._u_words[n]
+                r = np.minimum(np.searchsorted(u, words[n]), len(u) - 1)
+                valid &= (u[r] == words[n])
+                key = key * len(u) + r
+        pos = np.minimum(np.searchsorted(self._key, key), self.dim - 1)
+        found = valid & (self._key[pos] == key)
+        return np.where(found, pos, -1)
 
     # ------------------------------------------------------------------
     # Operators in the sector basis
@@ -108,19 +230,21 @@ class GaugeSector:
     def _plaquette_data(self):
         """Per plaquette: (flippable mask, source indices, target indices)."""
         if self._plaq_cache is None:
-            B = self.basis
+            idx_t = np.int32 if self.dim < 2 ** 31 else np.int64
             data = []
             for (b, r, t, l) in self.lattice.get_plaquettes():
-                bb, rr = (B >> b) & 1, (B >> r) & 1
-                tt, ll = (B >> t) & 1, (B >> l) & 1
+                bb, rr = self._bit(self._words, b), self._bit(self._words, r)
+                tt, ll = self._bit(self._words, t), self._bit(self._words, l)
                 flippable = ((bb == 1) & (rr == 1) & (tt == 0) & (ll == 0)) | \
                             ((bb == 0) & (rr == 0) & (tt == 1) & (ll == 1))
-                mask = (1 << b) | (1 << r) | (1 << t) | (1 << l)
                 src = np.nonzero(flippable)[0]
-                tgt = np.searchsorted(B, B[src] ^ mask)
-                if len(src) and not np.array_equal(B[tgt], B[src] ^ mask):
+                flipped = [w[src].copy() for w in self._words]
+                for q in (b, r, t, l):
+                    flipped[q // WORD_BITS] ^= np.int64(1) << (q % WORD_BITS)
+                tgt = self._lookup(flipped)
+                if len(src) and tgt.min() < 0:
                     raise RuntimeError("plaquette flip left the gauge sector")
-                data.append((flippable, src, tgt))
+                data.append((flippable, src.astype(idx_t), tgt.astype(idx_t)))
             self._plaq_cache = data
         return self._plaq_cache
 
@@ -152,7 +276,7 @@ class GaugeSector:
         return self._plaquette_data()[p][0].astype(float)
 
     def sz_diagonal(self, qubit: int) -> np.ndarray:
-        return self._sz(self.basis, qubit)
+        return self._sz(self._words, qubit)
 
     def hamiltonian(self, g: float = 0.0, J: float = 1.0, rk: float = 0.0,
                     field_pattern: str = "uniform") -> sp.csr_matrix:
@@ -271,11 +395,8 @@ class GaugeSector:
                              stop=times[-1], num=len(times), endpoint=True)
 
     def product_state(self, bits: int) -> np.ndarray:
-        k = np.searchsorted(self.basis, bits)
-        if k >= self.dim or self.basis[k] != bits:
-            raise ValueError("configuration is not in the gauge-invariant sector")
         vec = np.zeros(self.dim)
-        vec[k] = 1.0
+        vec[self.index_of(int(bits))] = 1.0
         return vec
 
     def embed(self, vec) -> np.ndarray:

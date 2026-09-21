@@ -16,7 +16,7 @@ class SimulationConfig:
     dt_scan: tuple = (0.1, 0.05, 0.025)
     casimir_widths: dict = field(default_factory=lambda: {
         2: tuple(range(1, 11)), 3: tuple(range(1, 7)), 4: tuple(range(1, 8)),
-        6: tuple(range(1, 5))})
+        6: tuple(range(1, 6))})       # 6x6 = 66 link qubits, 781,043 states
     seed: int = 2026
 
     @property

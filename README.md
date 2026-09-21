@@ -11,14 +11,14 @@ interactive explorer.
     python main.py --gui        # pop-up explorer (same as: python visualize.py)
     python make_figures.py      # thesis figures from results/summary.json
     python experiments.py all   # RK scan, filter scaling with d, noise study (~2 min)
-    python -m pytest -q         # 41 tests, ~40 s
+    python -m pytest -q         # 44 tests, ~40 s
     LEAN=lean proofs/check.sh   # Lean 4 proofs (plain toolchain, no Mathlib)
 
 | module | role |
 |---|---|
 | `lattice.py` | geometry, link indexing, proper plaquette colouring (2 sublayers for even W, 3 for odd W) |
 | `QuantumFields/gauge_field.py` | Hamiltonian terms (electric uniform/staggered, plaquette, RK), Gauss law with free or fixed plate charges |
-| `sector.py` | exact diagonalisation in the gauge-invariant sector (up to 62 link qubits), observables, dynamics |
+| `sector.py` | exact diagonalisation in the gauge-invariant sector (no qubit limit; bounded by the sector dimension, see `count_states`), observables, dynamics |
 | `circuit.py` | exact plaquette gate (13 CNOTs; 16 with the RQSVT ancilla), structured Trotter step, resource counters |
 | `rqsvt.py` | GQSP angle finding, Fourier filters, single-ancilla filter driven by exact / Trotter / qDRIFT evolution, Richardson extrapolation, Qiskit circuit |
 | `resources.py` | measured gate counts and the LCU block-encoding baseline |

@@ -198,8 +198,9 @@ class RQSVTGroundState:
         full_sector = GaugeSector(lattice, plates=plates, plate_charges=plate_charges)
         ref = full_sector.ground_state(g=g, J=J, rk=rk, field_pattern=field_pattern)
         self.support = ref['support']              # plate-charge sector of the GS
-        self.basis = full_sector.basis[self.support]
-        self.dim = len(self.basis)
+        self._sector = full_sector
+        self.basis = (full_sector.basis[self.support] if full_sector.n_words == 1 else None)
+        self.dim = len(self.support)
         self.E0, self.gap = ref['energy'], ref['gap']
         self.gs_exact = ref['state'][self.support]
         self.plate_charges = ref['plate_charges']
@@ -246,9 +247,10 @@ class RQSVTGroundState:
     def _initial_state(self, spec) -> np.ndarray:
         """A computational-basis (product) state inside the ground-state sector."""
         if isinstance(spec, (int, np.integer)):
-            k = int(np.searchsorted(self.basis, spec))
-            if k >= self.dim or self.basis[k] != spec:
-                raise ValueError("initial configuration is outside the sector")
+            hit = np.nonzero(self.support == self._sector.index_of(int(spec)))[0]
+            if not len(hit):
+                raise ValueError("initial configuration is outside the ground-state sector")
+            k = int(hit[0])
         elif spec == "best_basis":                 # oracle choice, for comparison
             k = int(np.argmax(np.abs(self.gs_exact)))
         elif spec == "max_flippable":              # needs no knowledge of the GS
@@ -259,7 +261,7 @@ class RQSVTGroundState:
             k = int(best[np.argmin(energy)])
         else:
             raise ValueError(f"unknown initial state {spec!r}")
-        self.initial_bits = int(self.basis[k])
+        self.initial_bits = self._sector.label(int(self.support[k]))
         psi = np.zeros(self.dim, dtype=complex)
         psi[k] = 1.0
         return psi

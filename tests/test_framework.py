@@ -266,3 +266,34 @@ def test_experiment_drivers_smoke(tmp_path, monkeypatch):
     overlaps = [r["initial_overlap"] for r in scaling["rows"]]
     assert overlaps[0] > overlaps[1] > overlaps[2]            # product-state overlap decays with d
     assert all(abs(r["richardson_error"]) < 5e-3 for r in scaling["rows"])
+
+
+# ---- lattices beyond one 62-bit label --------------------------------------------------------
+
+def test_count_states_matches_enumeration():
+    from sector import count_states
+    for W, H, plates in [(3, 3, "free"), (2, 5, "fixed"), (4, 4, "fixed"), (3, 2, "free")]:
+        lat = LatticeGrid(W, H)
+        assert count_states(lat, plates) == GaugeSector(lat, plates=plates).dim
+    assert count_states(LatticeGrid(8, 8), "fixed") == 56241588037      # why 8x8 ED is impossible
+
+
+def test_multiword_labels_reproduce_single_word_results(monkeypatch):
+    import sector
+    lat = LatticeGrid(4, 4)
+    ref = GaugeSector(lat, plates="fixed")
+    ref_gs = ref.ground_state(J=1.0, rk=0.3)
+    monkeypatch.setattr(sector, "WORD_BITS", 7)                       # force four words
+    multi = GaugeSector(lat, plates="fixed")
+    assert multi.n_words == 4
+    assert sorted(multi.label(k) for k in range(multi.dim)) == sorted(ref.basis.tolist())
+    gs = multi.ground_state(J=1.0, rk=0.3)
+    assert abs(gs["energy"] - ref_gs["energy"]) < 1e-10 and abs(gs["gap"] - ref_gs["gap"]) < 1e-8
+    assert multi.index_of(multi.label(17)) == 17
+    with pytest.raises(ValueError):
+        multi.basis
+
+
+def test_sector_refuses_oversized_lattices():
+    with pytest.raises(MemoryError):
+        GaugeSector(LatticeGrid(8, 8), plates="fixed")
