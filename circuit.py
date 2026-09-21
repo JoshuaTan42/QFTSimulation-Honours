@@ -192,13 +192,15 @@ class StructuredTrotter:
     """
 
     def __init__(self, lattice, g=0.0, J=1.0, dt=0.05, rk=0.0,
-                 field_pattern="uniform", order: int = 1, colouring="auto"):
+                 field_pattern="uniform", order: int = 1, colouring="auto",
+                 synthesis: str = None):
         if order not in (1, 2):
             raise ValueError("order must be 1 or 2")
         self.lattice = lattice
         self.n_qubits = lattice.n_qubits
         self.g, self.J, self.rk, self.dt = g, J, rk, dt
         self.order = order
+        self.synthesis = synthesis          # None -> PLAQUETTE_SYNTHESIS
         self.signs = field_signs(lattice, field_pattern)
         self.plaq_sublayers = lattice.get_plaquette_sublayers(colouring)
         self.electric_qubits = lattice.get_electric_qubits()
@@ -235,7 +237,8 @@ class StructuredTrotter:
         if self.J == 0.0:
             return
         for plaquette in plaquettes:
-            append_plaquette_rotation(qc, self.J * self.dt * fraction, plaquette)
+            append_plaquette_rotation(qc, self.J * self.dt * fraction, plaquette,
+                                      method=self.synthesis)
 
     def _apply_diagonal_layer(self, qc, fraction=1.0):
         """exp(-i dt f H_E) exp(-i dt f H_RK).
@@ -250,7 +253,7 @@ class StructuredTrotter:
             for layer in self.plaq_sublayers:
                 for plaquette in layer:
                     append_flippability_rotation(
-                        qc, self.rk * self.dt * fraction, plaquette)
+                        qc, self.rk * self.dt * fraction, plaquette, method=self.synthesis)
 
     # backwards-compatible name
     def _apply_electric_layer(self, qc, fraction=1.0):

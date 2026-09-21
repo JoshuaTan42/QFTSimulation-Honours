@@ -1,0 +1,118 @@
+{
+  "studies": [
+    {
+      "lattice": "2x2",
+      "qubits": 7,
+      "cx_gates": 384,
+      "E0": -2.8284271247461903,
+      "gap": 2.8284271247461903,
+      "method": "trotter",
+      "n_steps": 1,
+      "trajectories": 400,
+      "rows": [
+        {
+          "p": 0.0,
+          "expected_errors": 0.0,
+          "energy_raw": -2.8142470509099033,
+          "energy_gauge": -2.8142470509099033,
+          "accept_raw": 0.46148350900025614,
+          "accept_gauge": 0.46148350900025614,
+          "gauge_weight": 1.0
+        },
+        {
+          "p": 0.0001,
+          "expected_errors": 0.038400000000000004,
+          "energy_raw": -2.754024040487049,
+          "energy_gauge": -2.7721357772885957,
+          "accept_raw": 0.45510643321125543,
+          "accept_gauge": 0.4513616186938109,
+          "gauge_weight": 0.991771563212102
+        },
+        {
+          "p": 0.0003,
+          "expected_errors": 0.1152,
+          "energy_raw": -2.6070271405958887,
+          "energy_gauge": -2.7390189096599777,
+          "accept_raw": 0.44635774993827737,
+          "accept_gauge": 0.42191246693509504,
+          "gauge_weight": 0.9452338779677005
+        },
+        {
+          "p": 0.001,
+          "expected_errors": 0.384,
+          "energy_raw": -2.222161639847718,
+          "energy_gauge": -2.4869692164655617,
+          "accept_raw": 0.41480951336564,
+          "accept_gauge": 0.365854133334579,
+          "gauge_weight": 0.8819810576815086
+        },
+        {
+          "p": 0.003,
+          "expected_errors": 1.1520000000000001,
+          "energy_raw": -1.2485966837450426,
+          "energy_gauge": -1.8050323210230095,
+          "accept_raw": 0.3612850894833384,
+          "accept_gauge": 0.23776751960788986,
+          "gauge_weight": 0.65811605994566
+        }
+      ]
+    },
+    {
+      "lattice": "2x3",
+      "qubits": 11,
+      "cx_gates": 2048,
+      "E0": -4.898979485566356,
+      "gap": 2.070552360820166,
+      "method": "trotter",
+      "n_steps": 1,
+      "trajectories": 80,
+      "rows": [
+        {
+          "p": 0.0,
+          "expected_errors": 0.0,
+          "energy_raw": -4.871572771539161,
+          "energy_gauge": -4.871572771539161,
+          "accept_raw": 0.30350727301926606,
+          "accept_gauge": 0.30350727301926606,
+          "gauge_weight": 1.0
+        },
+        {
+          "p": 0.0001,
+          "expected_errors": 0.2048,
+          "energy_raw": -4.506327399751775,
+          "energy_gauge": -4.818283635248542,
+          "accept_raw": 0.27044204523003584,
+          "accept_gauge": 0.2502660579564261,
+          "gauge_weight": 0.9253962627872887
+        },
+        {
+          "p": 0.0003,
+          "expected_errors": 0.6144,
+          "energy_raw": -3.7262260403355625,
+          "energy_gauge": -4.598540377782172,
+          "accept_raw": 0.2502689114956532,
+          "accept_gauge": 0.18723520925994278,
+          "gauge_weight": 0.7481361074413542
+        },
+        {
+          "p": 0.001,
+          "expected_errors": 2.048,
+          "energy_raw": -1.2206986669620679,
+          "energy_gauge": -3.092080100246843,
+          "accept_raw": 0.24646417572554916,
+          "accept_gauge": 0.08549159654463093,
+          "gauge_weight": 0.3468723042322805
+        },
+        {
+          "p": 0.003,
+          "expected_errors": 6.144,
+          "energy_raw": -0.059472862476282716,
+          "energy_gauge": -1.8056819295804956,
+          "accept_raw": 0.33410972504224873,
+          "accept_gauge": 0.005509903697522174,
+          "gauge_weight": 0.016491299966875962
+        }
+      ]
+    }
+  ]
+}

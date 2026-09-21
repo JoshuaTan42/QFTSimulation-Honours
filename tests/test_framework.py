@@ -232,3 +232,37 @@ def test_explorer_headless(tmp_path):
     assert len(ex.trace["t"]) >= 3
     assert abs(ex.trace["echo"][0] - 1.0) < 1e-12
     assert ex.save(str(tmp_path / "explorer.png"))
+
+
+# ---- noise and experiment drivers ---------------------------------------------------------
+
+def test_trajectory_simulator_matches_qiskit():
+    from noise import TrajectorySimulator, compile_program
+    rq = RQSVTGroundState(LatticeGrid(2, 2), J=2.0, plates="fixed", filter_kind="gaussian")
+    qc = rq.build_circuit("trotter", n_steps=1)
+    program, n, phase = compile_program(qc)
+    sv = TrajectorySimulator(n).run(program) * np.exp(1j * phase)
+    ref = Statevector.from_label("0" * n).evolve(qc).data
+    assert np.linalg.norm(sv - ref) < 1e-10
+
+
+def test_gauss_law_postselection_mitigates_noise():
+    from noise import noisy_filter_study
+    rq = RQSVTGroundState(LatticeGrid(2, 2), J=2.0, plates="fixed", filter_kind="gaussian")
+    out = noisy_filter_study(rq, error_rates=(0.0, 3e-3), trajectories=150, seed=7)
+    clean, noisy = out["rows"]
+    assert abs(clean["gauge_weight"] - 1.0) < 1e-12          # no leakage without noise
+    assert noisy["gauge_weight"] < 0.95
+    assert abs(noisy["energy_gauge"] - rq.E0) < abs(noisy["energy_raw"] - rq.E0)
+
+
+def test_experiment_drivers_smoke(tmp_path, monkeypatch):
+    import experiments
+    monkeypatch.chdir(tmp_path)
+    scan = experiments.rk_scan(width=2, rks=(0.0, 0.5), separations=tuple(range(1, 7)),
+                               verbose=False)
+    assert len(scan["rows"]) == 2 and (tmp_path / "results" / "rk_scan.json").exists()
+    scaling = experiments.filter_scaling(width=2, separations=(1, 2, 3), verbose=False)
+    overlaps = [r["initial_overlap"] for r in scaling["rows"]]
+    assert overlaps[0] > overlaps[1] > overlaps[2]            # product-state overlap decays with d
+    assert all(abs(r["richardson_error"]) < 5e-3 for r in scaling["rows"])

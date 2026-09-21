@@ -1,0 +1,38 @@
+========================================================================
+rk-scan
+========================================================================
+ lam_RK=-0.50  xi= 0.10* alpha=9.00* SSE exp/pow=1.5e-06/2.2e-06 (exp)  all D2<0: False  gap(d=7)=0.781
+ lam_RK=-0.25  xi= 0.10* alpha=9.00* SSE exp/pow=1.4e-05/1.4e-05 (exp)  all D2<0: False  gap(d=7)=0.346
+ lam_RK=+0.00  xi=12.00* alpha=1.20* SSE exp/pow=5.6e-06/1.4e-05 (exp)  all D2<0: False  gap(d=7)=0.179
+ lam_RK=+0.25  xi=12.00* alpha=1.20* SSE exp/pow=6.3e-07/4.5e-06 (exp)  all D2<0: True  gap(d=7)=0.126
+ lam_RK=+0.50  xi= 3.00  alpha=1.20* SSE exp/pow=5.3e-11/2.2e-07 (exp)  all D2<0: True  gap(d=7)=0.120
+ lam_RK=+0.70  xi= 0.86  alpha=3.10  SSE exp/pow=7.3e-08/5.1e-08 (power)  all D2<0: False  gap(d=7)=0.135
+ lam_RK=+0.80  xi= 0.44  alpha=5.97  SSE exp/pow=5.6e-08/4.9e-08 (power)  all D2<0: False  gap(d=7)=0.140
+ lam_RK=+0.90  xi= 0.10* alpha=9.00* SSE exp/pow=3.2e-08/3.9e-08 (exp)  all D2<0: False  gap(d=7)=0.070
+ (* = fit parameter at the edge of its search range: not determined)
+ [81 s]  -> results/rk_scan*.json/.png
+========================================================================
+filter-scaling
+========================================================================
+ d=1  13 qubits  gap=1.035  signal ops=  32  overlap0=0.3333  P(success)=0.3035  err(n=1)=+1.4e-02  Richardson=+5.5e-04  2q gates=1,856  [0s]
+ d=2  21 qubits  gap=0.655  signal ops=  98  overlap0=0.1469  P(success)=0.1341  err(n=1)=+8.2e-03  Richardson=+2.4e-04  2q gates=12,544  [0s]
+ d=3  29 qubits  gap=0.475  signal ops= 200  overlap0=0.0601  P(success)=0.0552  err(n=1)=+6.6e-03  Richardson=+1.2e-04  2q gates=38,400  [1s]
+ d=4  37 qubits  gap=0.359  signal ops= 352  overlap0=0.0241  P(success)=0.0223  err(n=1)=+5.3e-03  Richardson=+7.4e-05  2q gates=90,112  [7s]
+ two-qubit gates grow as d^2.84 (expected about d^2 from lambda_H / gap)
+ [10 s]  -> results/filter_scaling*.json/.png
+========================================================================
+noise
+========================================================================
+ 2x2: 7 qubits, 384 CX, E0=-2.8284, 400 trajectories per point
+   p=0e+00  errors/circuit= 0.00  dE raw=+0.0142  dE gauge-selected=+0.0142  physical weight=1.000
+   p=1e-04  errors/circuit= 0.04  dE raw=+0.0744  dE gauge-selected=+0.0563  physical weight=0.992
+   p=3e-04  errors/circuit= 0.12  dE raw=+0.2214  dE gauge-selected=+0.0894  physical weight=0.945
+   p=1e-03  errors/circuit= 0.38  dE raw=+0.6063  dE gauge-selected=+0.3415  physical weight=0.882
+   p=3e-03  errors/circuit= 1.15  dE raw=+1.5798  dE gauge-selected=+1.0234  physical weight=0.658
+ 2x3: 11 qubits, 2048 CX, E0=-4.8990, 80 trajectories per point
+   p=0e+00  errors/circuit= 0.00  dE raw=+0.0274  dE gauge-selected=+0.0274  physical weight=1.000
+   p=1e-04  errors/circuit= 0.20  dE raw=+0.3927  dE gauge-selected=+0.0807  physical weight=0.925
+   p=3e-04  errors/circuit= 0.61  dE raw=+1.1728  dE gauge-selected=+0.3004  physical weight=0.748
+   p=1e-03  errors/circuit= 2.05  dE raw=+3.6783  dE gauge-selected=+1.8069  physical weight=0.347
+   p=3e-03  errors/circuit= 6.14  dE raw=+4.8395  dE gauge-selected=+3.0933  physical weight=0.016
+ [22 s]  -> results/noise*.json/.png

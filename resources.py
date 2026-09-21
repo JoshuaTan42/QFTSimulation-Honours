@@ -19,7 +19,6 @@ import numpy as np
 from qiskit import QuantumCircuit, transpile
 from qiskit.circuit.library import PauliGate, StatePreparation
 
-import circuit
 from circuit import (BASIS_GATES, StructuredTrotter, TrotterEvolution,
                      circuit_resources, two_qubit_count, two_qubit_depth)
 from lattice import LatticeGrid
@@ -37,13 +36,9 @@ def trotter_step_table(sizes, g=0.0, J=2.0, rk=0.0, dt=0.05,
                'plaquettes': lattice.n_plaquettes,
                'sublayers': lattice.n_plaquette_colours,
                'structured': circuit_resources(step)}
-        circuit.PLAQUETTE_SYNTHESIS = "pauli"      # the eight-ladder construction
-        try:
-            row['structured_pauli'] = circuit_resources(StructuredTrotter(
-                lattice, g=g, J=J, rk=rk, dt=dt, field_pattern=field_pattern
-            ).build_step(barriers=False))
-        finally:
-            circuit.PLAQUETTE_SYNTHESIS = "ucr"
+        row['structured_pauli'] = circuit_resources(StructuredTrotter(
+            lattice, g=g, J=J, rk=rk, dt=dt, field_pattern=field_pattern,
+            synthesis="pauli").build_step(barriers=False))   # eight-ladder construction
         if lattice.n_qubits <= generic_max_qubits:
             Hop = QuantumLinkModel(lattice, g=g, J=J, rk=rk,
                                    field_pattern=field_pattern).build_physical_hamiltonian()
@@ -117,11 +112,7 @@ def ground_state_comparison(rq, trotter_steps=1, qdrift_samples=800) -> dict:
     be = block_encoding_baseline(rq.lattice, g=rq.g, J=rq.J, rk=rq.rk,
                                  field_pattern=rq.field_pattern)
     calls = rq.n_signal
-    circuit.PLAQUETTE_SYNTHESIS = "pauli"
-    try:
-        pauli = rq.resources('trotter', n_steps=trotter_steps)
-    finally:
-        circuit.PLAQUETTE_SYNTHESIS = "ucr"
+    pauli = rq.resources('trotter', n_steps=trotter_steps, synthesis="pauli")
     return {
         'gqsp_trotter_pauli_ladders': pauli,
         'filter': rq.filter_kind,

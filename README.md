@@ -10,7 +10,8 @@ interactive explorer.
     python main.py --quick      # small lattices only
     python main.py --gui        # pop-up explorer (same as: python visualize.py)
     python make_figures.py      # thesis figures from results/summary.json
-    python -m pytest -q         # 38 tests, ~40 s
+    python experiments.py all   # RK scan, filter scaling with d, noise study (~2 min)
+    python -m pytest -q         # 41 tests, ~40 s
     LEAN=lean proofs/check.sh   # Lean 4 proofs (plain toolchain, no Mathlib)
 
 | module | role |
@@ -23,8 +24,12 @@ interactive explorer.
 | `resources.py` | measured gate counts and the LCU block-encoding baseline |
 | `casimir.py` | E0(d), bulk subtraction, power-law and exponential fits, model-free second difference |
 | `tensor_compression.py` | DMRG (quimb, compressed MPO) and MPS compressibility |
+| `noise.py` | trajectory simulator for two-qubit depolarising noise, Gauss-law post-selection |
+| `experiments.py` | research drivers: RK scan, filter cost against d, noise study |
 | `visualize.py` | interactive explorer with sliders, radio buttons and a real-time quench |
 | `proofs/` | Lean 4: link counts, gauge invariance, colouring, Pauli expansions, extraction identities |
+
+See `GUIDE.md` for a step-by-step walkthrough and the research protocol.
 
 Conventions: qubit |0> is S^z = +1/2; basis-state integers are Qiskit statevector
 indices; Pauli labels are little-endian. Performance notes: all classical

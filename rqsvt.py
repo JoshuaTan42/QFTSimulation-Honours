@@ -315,6 +315,7 @@ class RQSVTGroundState:
     # dim x dim matrix, a whole Trotter step collapses to one matrix per branch,
     # and a qDRIFT sample costs two small mat-vecs.
     DENSE_DIM = 400
+    EXACT_DENSE_DIM = 3000
 
     def _dense_term(self, key, angle):
         """(exp(+i angle h_k), exp(-i angle h_k)) as dense matrices."""
@@ -353,7 +354,11 @@ class RQSVTGroundState:
         rng = np.random.default_rng(seed)
         dense = self.dim <= self.DENSE_DIM
         probs = np.array([abs(a) for _, _, a in self.terms]) / self.lambda_H
-        if method == "exact":
+        big_exact = method == "exact" and self.dim > self.EXACT_DENSE_DIM
+        if big_exact:
+            from scipy.sparse.linalg import expm_multiply
+            gen = 0.5j * self.t0 * self._H
+        elif method == "exact":
             Wp, Wm = self._signal_exact()
         elif method == "trotter" and dense:
             Wp, Wm = self._dense_trotter_signal(n_steps)
@@ -364,7 +369,9 @@ class RQSVTGroundState:
         n_rotations = 0
         per_step = len(self._trotter_sequence(1))
         for k in range(1, self.n_signal + 1):
-            if method == "exact" or (method == "trotter" and dense):
+            if big_exact:
+                x0, x1 = expm_multiply(gen, x0), expm_multiply(-gen, x1)
+            elif method == "exact" or (method == "trotter" and dense):
                 x0, x1 = Wp @ x0, Wm @ x1
                 n_rotations += 0 if method == "exact" else per_step * n_steps
             elif method == "qdrift" and dense:
@@ -419,20 +426,20 @@ class RQSVTGroundState:
 
     # ---- Qiskit circuit --------------------------------------------------------
 
-    def _append_term(self, qc, key, angle, ancilla):
-        """exp(i angle Z_anc (x) h_k) as Pauli rotations."""
+    def _append_term(self, qc, key, angle, ancilla, synthesis=None):
+        """exp(i angle Z_anc (x) h_k) as gates."""
         kind, idx = key
         if kind == 'plaq':
             append_plaquette_rotation(qc, -angle, self.lattice.get_plaquettes()[idx],
-                                      ancilla=ancilla)
+                                      ancilla=ancilla, method=synthesis)
         elif kind == 'flip':
             append_flippability_rotation(qc, -angle, self.lattice.get_plaquettes()[idx],
-                                         ancilla=ancilla)
+                                         ancilla=ancilla, method=synthesis)
         else:
             append_pauli_rotation(qc, -angle, [idx, ancilla], ['Z', 'Z'])
 
     def build_circuit(self, method="qdrift", n_steps=1, n_samples=20, seed=0,
-                      max_signal: int = None) -> QuantumCircuit:
+                      max_signal: int = None, synthesis: str = None) -> QuantumCircuit:
         """(N_q + 1)-qubit circuit; the ancilla is qubit N_q and starts in |0>.
 
         `max_signal` truncates the circuit after that many signal operators, for
@@ -452,17 +459,17 @@ class RQSVTGroundState:
             seq = (self._trotter_sequence(n_steps) if method == "trotter"
                    else self._qdrift_sequence(n_samples, rng))
             for key, weight in seq:
-                self._append_term(qc, key, 0.5 * self.t0 * weight, anc)
+                self._append_term(qc, key, 0.5 * self.t0 * weight, anc, synthesis)
             qc.unitary(gqsp_rotation(self.theta[k], self.phi[k]), [anc], label=f"R{k}")
         return qc
 
     def resources(self, method="qdrift", n_steps=1, n_samples=20, seed=0,
-                  probe_signal: int = 4) -> dict:
+                  probe_signal: int = 4, synthesis: str = None) -> dict:
         """Gate counts of the full circuit, extrapolated from `probe_signal`
         transpiled signal operators (the circuit is periodic in structure)."""
         probe = min(probe_signal, self.n_signal)
         res = circuit_resources(self.build_circuit(method, n_steps, n_samples, seed,
-                                                   max_signal=probe))
+                                                   max_signal=probe, synthesis=synthesis))
         scale = self.n_signal / probe
         return {'qubits': self.n + 1,
                 'signal_operators': self.n_signal,

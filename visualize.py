@@ -186,8 +186,7 @@ class CasimirExplorer:
 
     def _on_play(self, _):
         if self.view != "quench":
-            self.view = "quench"
-            self.restart_quench()
+            self.r_view.set_active(1)              # fires _on_view("quench")
         self.playing = not self.playing
         (self.timer.start if self.playing else self.timer.stop)()
 
