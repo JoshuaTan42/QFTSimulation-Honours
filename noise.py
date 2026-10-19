@@ -8,9 +8,12 @@ Two estimators are reported for the post-selected energy:
     raw     ancilla measured in |0>, nothing else
     gauge   additionally project the link register onto the physical sector
             (Gauss's law and the plate charges of the initial state)
-The second is the error-detection scheme a gauge theory provides for free: a
+The second is the error detection that a gauge theory provides for free: a
 Pauli error almost always violates Gauss's law somewhere, so discarding those
 shots removes most of the damage at the price of a lower acceptance rate.
+
+Both energies are ratios <phi|H|phi> / <phi|phi> of trajectory averages; their
+standard errors are propagated with the delta method.
 
 The simulator handles the transpiled gate set {cx, rz, sx, x} on up to about
 14 qubits and is validated against qiskit.quantum_info.Statevector at p = 0.
@@ -45,7 +48,7 @@ def compile_program(qc) -> tuple:
 
 
 class TrajectorySimulator:
-    """Statevector stored as a rank-n tensor with axis k = qubit n-1-k, so that
+    """Statevector as a rank-n tensor with axis k = qubit n-1-k, so that
     ravel() is the Qiskit (little-endian) statevector."""
 
     def __init__(self, n_qubits: int):
@@ -88,7 +91,7 @@ class TrajectorySimulator:
             elif name == 'cx':
                 psi = self.apply_cx(psi, *qubits)
                 if p > 0.0 and rng.random() < p:
-                    k = int(rng.integers(1, 16))          # 15 non-identity Paulis
+                    k = int(rng.integers(1, 16))          # one of the 15 non-identity Paulis
                     for q, lab in zip(qubits, (labels[k // 4], labels[k % 4])):
                         if lab != 'I':
                             psi = self.apply_1q(psi, _PAULI[lab], q)
@@ -97,13 +100,24 @@ class TrajectorySimulator:
         return psi.reshape(-1)
 
 
+def _ratio(num, den) -> tuple:
+    """mean(num) / mean(den) and its standard error (delta method)."""
+    num, den = np.asarray(num), np.asarray(den)
+    n = len(num)
+    r = num.mean() / den.mean()
+    if n < 2:
+        return float(r), 0.0
+    resid = num - r * den
+    return float(r), float(np.sqrt(np.var(resid, ddof=1) / n) / abs(den.mean()))
+
+
 def noisy_filter_study(rq, error_rates=(0.0, 1e-4, 3e-4, 1e-3, 3e-3), method="trotter",
                        n_steps=1, trajectories=200, seed=0) -> dict:
     """Energy of the filtered state against the two-qubit error rate.
 
     `rq` is an RQSVTGroundState on a lattice small enough for a statevector
     (N_q + 1 <= ~14). Returns, per error rate, the raw and gauge-post-selected
-    energies with their acceptance probabilities.
+    energies with standard errors and their acceptance probabilities.
     """
     n = rq.n
     program, n_qubits, _ = compile_program(rq.build_circuit(method, n_steps=n_steps))
@@ -116,22 +130,24 @@ def noisy_filter_study(rq, error_rates=(0.0, 1e-4, 3e-4, 1e-3, 3e-3), method="tr
     rows = []
     for p in error_rates:
         shots = 1 if p == 0.0 else trajectories
-        acc = dict(raw_num=0.0, raw_den=0.0, g_num=0.0, g_den=0.0)
+        acc = {k: [] for k in ('raw_num', 'raw_den', 'g_num', 'g_den')}
         for _ in range(shots):
             sv = sim.run(program, p, rng)
-            phi = sv[:2 ** n]                              # ancilla (MSB) = 0
-            acc['raw_num'] += np.vdot(phi, H_full @ phi).real
-            acc['raw_den'] += np.vdot(phi, phi).real
+            phi = sv[:2 ** n]                              # ancilla (most significant) = 0
+            acc['raw_num'].append(np.vdot(phi, H_full @ phi).real)
+            acc['raw_den'].append(np.vdot(phi, phi).real)
             phys = phi[rq.basis]                           # physical sector only
-            acc['g_num'] += np.vdot(phys, rq._H @ phys).real
-            acc['g_den'] += np.vdot(phys, phys).real
+            acc['g_num'].append(np.vdot(phys, rq._H @ phys).real)
+            acc['g_den'].append(np.vdot(phys, phys).real)
+        e_raw, e_raw_err = _ratio(acc['raw_num'], acc['raw_den'])
+        e_g, e_g_err = _ratio(acc['g_num'], acc['g_den'])
         rows.append({'p': p,
                      'expected_errors': p * n_cx,
-                     'energy_raw': acc['raw_num'] / acc['raw_den'],
-                     'energy_gauge': acc['g_num'] / acc['g_den'],
-                     'accept_raw': acc['raw_den'] / shots,
-                     'accept_gauge': acc['g_den'] / shots,
-                     'gauge_weight': acc['g_den'] / acc['raw_den']})
+                     'energy_raw': e_raw, 'energy_raw_err': e_raw_err,
+                     'energy_gauge': e_g, 'energy_gauge_err': e_g_err,
+                     'accept_raw': float(np.mean(acc['raw_den'])),
+                     'accept_gauge': float(np.mean(acc['g_den'])),
+                     'gauge_weight': float(np.sum(acc['g_den']) / np.sum(acc['raw_den']))})
     return {'lattice': f"{rq.lattice.width}x{rq.lattice.height}", 'qubits': n_qubits,
             'cx_gates': n_cx, 'E0': rq.E0, 'gap': rq.gap, 'method': method,
             'n_steps': n_steps, 'trajectories': trajectories, 'rows': rows}

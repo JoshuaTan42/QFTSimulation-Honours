@@ -1,4 +1,4 @@
-"""Resource analysis (thesis Sec. 2.3.6).
+"""Resource analysis of the circuits.
 
 Everything reported here is *measured* on circuits built by this package and
 transpiled to {cx, rz, sx, x} at optimisation level 3, except the
@@ -20,13 +20,14 @@ from qiskit import QuantumCircuit, transpile
 from qiskit.circuit.library import PauliGate, StatePreparation
 
 from circuit import (BASIS_GATES, StructuredTrotter, TrotterEvolution,
-                     circuit_resources, two_qubit_count, two_qubit_depth)
+                     circuit_resources, two_qubit_count)
 from lattice import LatticeGrid
 from QuantumFields.gauge_field import QuantumLinkModel
 
 
 def trotter_step_table(sizes, g=0.0, J=2.0, rk=0.0, dt=0.05,
                        field_pattern="uniform", generic_max_qubits=21) -> list:
+    """One Trotter step per lattice: compact and Pauli-ladder plaquette gates, generic baseline."""
     rows = []
     for (W, H) in sizes:
         lattice = LatticeGrid(W, H)
@@ -77,8 +78,9 @@ def block_encoding_baseline(lattice, g=0.0, J=2.0, rk=0.0,
     for idx, k in enumerate(keep):
         gate = PauliGate(labels[k]).control(m, ctrl_state=idx)
         select.append(gate, list(range(n, n + m)) + list(range(n)))
-        # negative coefficients need a controlled phase of pi on the index register;
-        # it adds no two-qubit gates at this level of accounting and is omitted
+        # Negative coefficients need a phase of pi on the corresponding index
+        # state. It adds no two-qubit gates at this level of accounting and is
+        # therefore not built.
     select = transpile(select, basis_gates=BASIS_GATES,
                        optimization_level=optimization_level)
 

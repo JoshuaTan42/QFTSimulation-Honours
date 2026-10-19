@@ -1,4 +1,4 @@
-"""Test-suite: python -m pytest -q   (about one minute)."""
+"""Core framework: lattice, Hamiltonian, sector ED, circuits, filter, Casimir analysis."""
 
 import numpy as np
 import pytest
@@ -59,8 +59,8 @@ def test_uniform_field_is_conserved_staggered_is_not():
     assert l1((HE_s @ HB) - (HB @ HE_s)) > 1.0
 
 
-def test_draft_parameters_give_a_product_state():
-    """g = 6, J = 2 (draft values): ground state |0...0>, E0 = -(g/2) N_q, exactly."""
+def test_strong_uniform_field_gives_a_product_state():
+    """g = 6, J = 2: the uniform field wins, ground state |0...0>, E0 = -(g/2) N_q exactly."""
     lat = LatticeGrid(3, 3)
     H = QuantumLinkModel(lat, g=6.0, J=2.0, gauss_penalty=200.0).build_hamiltonian()
     w, v = eigsh(H.to_matrix(sparse=True), k=1, which="SA")
@@ -259,13 +259,20 @@ def test_gauss_law_postselection_mitigates_noise():
 def test_experiment_drivers_smoke(tmp_path, monkeypatch):
     import experiments
     monkeypatch.chdir(tmp_path)
-    scan = experiments.rk_scan(width=2, rks=(0.0, 0.5), separations=tuple(range(1, 7)),
-                               verbose=False)
-    assert len(scan["rows"]) == 2 and (tmp_path / "results" / "rk_scan.json").exists()
+    experiments.main(["rk-scan", "--width", "2", "--rks", "0.0,0.5", "--dmax", "6"])
+    scan = __import__("json").load(open(tmp_path / "results" / "rk_scan_W2.json"))
+    assert len(scan["rows"]) == 2
     scaling = experiments.filter_scaling(width=2, separations=(1, 2, 3), verbose=False)
     overlaps = [r["initial_overlap"] for r in scaling["rows"]]
     assert overlaps[0] > overlaps[1] > overlaps[2]            # product-state overlap decays with d
     assert all(abs(r["richardson_error"]) < 5e-3 for r in scaling["rows"])
+    for name in ("width", "electric", "trotter-order", "quench", "trotter-budget",
+                 "filter-design"):
+        experiments.COMMANDS[name][0](verbose=False, **experiments.QUICK[name])
+    produced = {p.name for p in (tmp_path / "results").iterdir()}
+    for stem in ("width_extrapolation", "electric_scan_W2", "trotter_order", "quench_W2",
+                 "trotter_budget_2x3", "filter_design_2x3"):
+        assert f"{stem}.json" in produced and f"{stem}.png" in produced
 
 
 # ---- lattices beyond one 62-bit label --------------------------------------------------------

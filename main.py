@@ -1,18 +1,23 @@
-"""Top-level pipeline for "Towards Optimized Casimir Simulations".
+"""Core pipeline for "Towards Optimized Casimir Simulations".
 
-Runs every experiment of the methodology chapter and writes the numbers quoted
-in the thesis to results/summary.json (plus figures):
+Runs the reference experiments and writes every number they produce to
+results/summary.json (plus figures):
 
-    1  Hamiltonian construction and verification          (Sec. 2.3.1)
-    2  Classical reference and Gauss-penalty scan          (Sec. 2.3.2)
-    3  Structured Trotter: error scaling and resources     (Sec. 2.3.3, 2.3.6)
-    4  RQSVT ground-state preparation and resources        (Sec. 2.3.4, 2.3.6)
-    5  Casimir energy against plate separation             (Sec. 2.3.5)
-    6  DMRG cross-check                                    (Sec. 2.4.2)
+    1  Hamiltonian construction and verification (commutators, colouring)
+    2  Classical reference: sector ED against the penalised full-space
+       Hamiltonian, and the Gauss-law penalty scan
+    3  Structured Trotter step: error scaling and measured resources
+    4  Single-ancilla ground-state filter (RQSVT) and its resources against
+       a block-encoded QSVT baseline
+    5  Casimir energy against plate separation
+    6  DMRG cross-check
 
-    python main.py            full run
+    python main.py            full run (about two minutes)
     python main.py --quick    small lattices only (about a minute)
     python main.py --gui      open the interactive explorer instead
+
+The research studies built on this pipeline are in experiments.py, the
+hardware experiments in hardware.py.
 """
 
 from __future__ import annotations
@@ -27,7 +32,7 @@ from scipy.sparse.linalg import eigsh
 
 from casimir import plot_scan, run_casimir_scan
 from circuit import trotter_error
-from config import SimulationConfig
+from config import SimulationConfig, environment
 from lattice import LatticeGrid
 from QuantumFields.gauge_field import GaussLaw, QuantumLinkModel
 from resources import ground_state_comparison, trotter_step_table
@@ -84,6 +89,7 @@ def verify_hamiltonian(cfg) -> dict:
 
 
 def classical_reference(cfg) -> dict:
+    """Sector ED against the penalised Hamiltonian; energy and violation against the penalty."""
     banner("2  Classical reference and Gauss-law penalty scan")
     out = {'lattices': [], 'penalty_scan': []}
     for (W, H) in [(2, 2), (cfg.width, cfg.height)]:
@@ -93,7 +99,7 @@ def classical_reference(cfg) -> dict:
                                  field_pattern=cfg.field_pattern)
         violation = GaussLaw(lattice).max_violation(sector.embed(gs['state']))
         energies = []
-        for seed in range(3):                      # eigensolver reproducibility
+        for seed in range(3):                      # three random starts: eigensolver spread
             rng = np.random.default_rng(cfg.seed + seed)
             Hfull = QuantumLinkModel(lattice, g=cfg.g, J=cfg.J, rk=cfg.rk,
                                      gauss_penalty=cfg.penalty,
@@ -136,6 +142,7 @@ def classical_reference(cfg) -> dict:
 
 
 def trotter_analysis(cfg, quick) -> dict:
+    """Error order of the structured step and its gate counts against lattice size."""
     banner("3  Structured Trotter decomposition")
     out = {'error_scaling': [], 'resources': []}
     lattice = LatticeGrid(2, 3)
@@ -162,7 +169,8 @@ def trotter_analysis(cfg, quick) -> dict:
 
 
 def rqsvt_analysis(cfg, quick) -> dict:
-    banner("4  RQSVT ground-state preparation (one ancilla)")
+    """Filter accuracy (exact, Trotter, qDRIFT signal operators) and gate counts."""
+    banner("4  Single-ancilla ground-state filter (RQSVT)")
     out = {}
     lattice = LatticeGrid(cfg.width, cfg.height)
     for kind in ("step", "gaussian"):
@@ -202,6 +210,7 @@ def rqsvt_analysis(cfg, quick) -> dict:
 
 
 def casimir_analysis(cfg, quick) -> dict:
+    """E0(d) scans at every width in the configuration, plus lam_RK = 0.5 at W = 4."""
     banner("5  Casimir energy against plate separation")
     out = {}
     os.makedirs("results", exist_ok=True)
@@ -221,8 +230,9 @@ def casimir_analysis(cfg, quick) -> dict:
 
 
 def dmrg_analysis(cfg) -> dict:
+    """DMRG against sector ED, and MPS compressibility of exact ground states."""
     banner("6  DMRG cross-check")
-    from tensor_compression import run_compression_scan, validate_dmrg
+    from tensor_network import run_compression_scan, validate_dmrg
     out = {'validation': [validate_dmrg(LatticeGrid(2, 3), J=cfg.J, plates="fixed"),
                           validate_dmrg(LatticeGrid(cfg.width, cfg.height), J=cfg.J)]}
     out['compression'] = run_compression_scan([(2, 3), (3, 3)])
@@ -232,9 +242,9 @@ def dmrg_analysis(cfg) -> dict:
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--quick", action="store_true")
-    parser.add_argument("--skip-dmrg", action="store_true")
-    parser.add_argument("--gui", action="store_true")
+    parser.add_argument("--quick", action="store_true", help="small lattices only")
+    parser.add_argument("--skip-dmrg", action="store_true", help="omit the DMRG cross-check")
+    parser.add_argument("--gui", action="store_true", help="open the interactive explorer")
     args = parser.parse_args()
 
     if args.gui:
@@ -244,7 +254,8 @@ def main():
 
     cfg = SimulationConfig()
     start = time.time()
-    summary = {'config': {k: v for k, v in vars(cfg).items() if k != 'casimir_widths'}}
+    summary = {'environment': environment(),
+               'config': {k: v for k, v in vars(cfg).items() if k != 'casimir_widths'}}
     summary['verification'] = verify_hamiltonian(cfg)
     summary['classical'] = classical_reference(cfg)
     summary['trotter'] = trotter_analysis(cfg, args.quick)

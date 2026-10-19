@@ -1,25 +1,26 @@
-"""Exact diagonalisation inside the gauge-invariant sector.
+"""Exact diagonalisation inside the gauge-invariant sector of the pure-gauge model.
 
-The penalised qubit Hamiltonian lives in a 2^N_q dimensional space, but Gauss's
-law removes almost all of it: the 3x3 cylinder has 2^15 = 32768 qubit states,
-1792 of which satisfy Gauss's law on the interior sites, and only 21 of those
-share the plate-charge pattern of the ground state. Working directly in that
-subspace
+The qubit Hamiltonian lives in a 2^N_q dimensional space, but Gauss's law
+removes almost all of it: the 3x3 cylinder has 2^15 = 32768 qubit states, 1792
+of which satisfy Gauss's law on the interior sites, and only 21 of those share
+the plate-charge pattern of the ground state. Working directly in that subspace
 
-  * gives the classical reference to machine precision with no penalty term
-    (so no penalty-induced conditioning problems),
-  * reaches separations d = H - 1 far beyond full-space sparse ED. Basis labels
-    are stored in 62-bit words, as many as needed, so the number of link qubits
-    is unlimited; what limits the method is the sector dimension, which
-    `count_states` returns exactly (transfer-matrix count) before anything is
-    enumerated,
-  * makes the conserved plate charges explicit, which resolves the ground-state
-    degeneracy seen by the penalised Hamiltonian with free plates.
+  * gives the classical reference to machine precision with no penalty term,
+    so there is no penalty-induced ill-conditioning,
+  * reaches plate separations far beyond full-space sparse ED. Basis labels
+    are stored in 62-bit words, as many as needed, so the number of link
+    qubits is not limited; the sector dimension is, and `count_states`
+    returns it exactly (transfer-matrix count) before anything is enumerated,
+  * makes the conserved plate charges explicit, which resolves the
+    ground-state degeneracy seen by the penalised Hamiltonian with free plates.
 
 Basis states are bit strings whose bit q is the state of link qubit q
 (bit 1 = |1> = S^z = -1/2), i.e. exactly the Qiskit statevector index. For
 N_q <= 62 they are exposed as the int64 array `basis`; beyond that use
 `label(k)` / `index_of(bits)`, which work with Python integers.
+
+The basis is enumerated row by row: the horizontal links of a row are free,
+and Gauss's law at each site of the row then fixes the vertical link above it.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ from scipy.sparse.linalg import eigsh, expm_multiply
 from QuantumFields.gauge_field import GaussLaw, field_signs
 
 WORD_BITS = 62                 # link qubits per int64 word of a basis label
-DENSE_LIMIT = 600
+DENSE_LIMIT = 600              # dense eigensolver below this dimension, Lanczos above
 CHUNK = 1 << 22                # states expanded at once during enumeration
 
 
@@ -228,7 +229,12 @@ class GaugeSector:
     # ------------------------------------------------------------------
 
     def _plaquette_data(self):
-        """Per plaquette: (flippable mask, source indices, target indices)."""
+        """Per plaquette: (flippable mask, source indices, target indices), cached.
+
+        A plaquette flips exactly two configurations of its links into each
+        other, so U_p + U_p^dag restricted to the sector is the permutation
+        src[k] <-> tgt[k] on the flippable states.
+        """
         if self._plaq_cache is None:
             idx_t = np.int32 if self.dim < 2 ** 31 else np.int64
             data = []
@@ -267,20 +273,28 @@ class GaugeSector:
         return self._HB
 
     def flippable_count(self) -> np.ndarray:
+        """Number of flippable plaquettes in every basis state."""
         if self._flip_count is None:
             self._flip_count = np.sum([d[0] for d in self._plaquette_data()],
                                       axis=0).astype(float)
         return self._flip_count
 
     def flippable(self, p: int) -> np.ndarray:
+        """1 where plaquette p is flippable, else 0, for every basis state."""
         return self._plaquette_data()[p][0].astype(float)
 
+    def plaquette_flips(self, p: int) -> tuple:
+        """(src, tgt): U_p + U_p^dag maps basis state src[k] to tgt[k] (and back)."""
+        _, src, tgt = self._plaquette_data()[p]
+        return src, tgt
+
     def sz_diagonal(self, qubit: int) -> np.ndarray:
+        """S^z of link `qubit` in every basis state."""
         return self._sz(self._words, qubit)
 
-    def hamiltonian(self, g: float = 0.0, J: float = 1.0, rk: float = 0.0,
-                    field_pattern: str = "uniform") -> sp.csr_matrix:
-        """H_E + H_B + H_RK in the sector basis (no penalty needed)."""
+    def diagonal(self, g: float = 0.0, rk: float = 0.0,
+                 field_pattern: str = "uniform") -> np.ndarray:
+        """Diagonal part H_E + H_RK of the Hamiltonian in the sector basis."""
         diag = np.zeros(self.dim)
         if rk != 0.0:
             diag += rk * self.flippable_count()
@@ -288,8 +302,13 @@ class GaugeSector:
             signs = field_signs(self.lattice, field_pattern)
             for q in range(self.lattice.n_qubits):
                 diag += -g * signs[q] * self.sz_diagonal(q)
+        return diag
+
+    def hamiltonian(self, g: float = 0.0, J: float = 1.0, rk: float = 0.0,
+                    field_pattern: str = "uniform") -> sp.csr_matrix:
+        """H_E + H_B + H_RK in the sector basis (no penalty needed)."""
         H = J * self.magnetic_matrix() if J != 0.0 else sp.csr_matrix((self.dim, self.dim))
-        return (H + sp.diags(diag)).tocsr()
+        return (H + sp.diags(self.diagonal(g, rk, field_pattern))).tocsr()
 
     # ------------------------------------------------------------------
     # Conserved plate charges
@@ -307,12 +326,18 @@ class GaugeSector:
                 cols.append(div)
         return np.array(cols).T
 
-    def charge_sectors(self) -> list:
-        """[(charge pattern, basis indices)] for every static plate-charge sector."""
-        table = self.plate_charge_table()
-        patterns, inverse = np.unique(table, axis=0, return_inverse=True)
-        inverse = np.asarray(inverse).ravel()
-        return [(patterns[k], np.nonzero(inverse == k)[0]) for k in range(len(patterns))]
+    def most_flippable(self, support, H_support=None) -> int:
+        """Local index (within `support`) of the basis state with most flippable plaquettes.
+
+        This product state needs no knowledge of the ground state; it is the
+        initial state of the ground-state filter and of the quench studies.
+        Ties are broken by the lowest diagonal energy of `H_support`.
+        """
+        count = self.flippable_count()[support]
+        best = np.nonzero(count == count.max())[0]
+        if H_support is None:
+            return int(best[0])
+        return int(best[np.argmin(H_support.diagonal()[best])])
 
     # ------------------------------------------------------------------
     # Spectra
@@ -372,6 +397,7 @@ class GaugeSector:
     # ------------------------------------------------------------------
 
     def electric_field(self, vec) -> np.ndarray:
+        """<S^z> on every link qubit."""
         prob = np.abs(vec) ** 2
         return np.array([prob @ self.sz_diagonal(q)
                          for q in range(self.lattice.n_qubits)])
@@ -383,6 +409,7 @@ class GaugeSector:
                          for _, src, tgt in self._plaquette_data()])
 
     def flippability(self, vec) -> np.ndarray:
+        """<(U_p + U_p^dag)^2> for every plaquette."""
         prob = np.abs(vec) ** 2
         return np.array([prob @ d[0] for d in self._plaquette_data()])
 
@@ -395,6 +422,7 @@ class GaugeSector:
                              stop=times[-1], num=len(times), endpoint=True)
 
     def product_state(self, bits: int) -> np.ndarray:
+        """Sector vector of the computational-basis state with the given bits."""
         vec = np.zeros(self.dim)
         vec[self.index_of(int(bits))] = 1.0
         return vec
@@ -406,7 +434,3 @@ class GaugeSector:
         full = np.zeros(2 ** self.lattice.n_qubits, dtype=np.asarray(vec).dtype)
         full[self.basis] = vec
         return full
-
-    def project(self, full) -> np.ndarray:
-        """Full statevector -> sector components (weight outside is dropped)."""
-        return np.asarray(full)[self.basis]

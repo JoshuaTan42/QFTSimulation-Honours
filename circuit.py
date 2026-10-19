@@ -1,42 +1,57 @@
-"""Time evolution for the pure-gauge U(1) quantum link model (thesis Sec. 2.3.3).
+"""Quantum circuits for time evolution in U(1) quantum link models.
 
-  StructuredTrotter    half-electric layer, one sublayer per plaquette colour,
-                       half-electric layer. Plaquettes inside a sublayer share
-                       no link, so they run in parallel and the two-qubit depth
-                       of a step does not grow with W or H.
-  TrotterEvolution     generic Suzuki-Trotter baseline on the flat Pauli list.
-  DynamicalSimulation  exact statevector evolution with observables, plus an
-                       Estimator-based hardware runner.
+Gate constructions
+  append_two_level_rotation   exp(-i theta (|a><b| + |b><a|)) for two bit strings
+                              a, b on a set of qubits: CNOT fan-out from a pivot
+                              qubit, one uniformly controlled rotation, fan-in.
+                              Plaquette flips (U_p + U_p^dag) and gauge-matter
+                              hopping terms are both of this form, so both are
+                              exact and gauge invariant (a single Pauli string of
+                              their expansion is not).
+  append_two_level_phase      exp(-i theta (|a><a| + |b><b|)), the diagonal
+                              Rokhsar-Kivelson term.
+  With `ancilla=` both gates implement the generator Z_anc (x) h instead of h,
+  which is the signal operator of the single-ancilla ground-state filter
+  (rqsvt.py). No controlled time evolution is needed.
 
-Joshi et al. (2026) quote a two-qubit depth of 28 per step. That figure belongs
-to their model (matter hopping, open boundaries, native ZZ gates): four
-sublayers of depth <= 7 set by the hopping circuit. It does not transfer to the
-pure-gauge cylinder, where the depth is set by the plaquette circuit and, for
-odd W, by three sublayers instead of two. The numbers reported by this module
-are measured on the circuits it actually builds.
+Trotter steps
+  StructuredTrotter   pure-gauge cylinder: half diagonal layer, one sublayer per
+                      plaquette colour, half diagonal layer. Plaquettes in a
+                      sublayer share no link and run in parallel, so the
+                      two-qubit depth of a step does not grow with W or H.
+  MatterTrotter       matter-coupled model of Joshi et al. on an open lattice:
+                      four sublayers of commuting hopping and plaquette terms
+                      between half layers of the mass and electric terms.
+  TrotterEvolution    generic Suzuki-Trotter on the flat Pauli list (baseline).
+
+All resource numbers in this package are measured on these circuits after
+transpilation to {cx, rz, sx, x} (or another basis passed explicitly).
 """
 
 from __future__ import annotations
 
 import numpy as np
 from qiskit import QuantumCircuit, transpile
-from qiskit.circuit.library import (PauliEvolutionGate, StatePreparation, UCRXGate,
-                                    UCRZGate)
-from qiskit.quantum_info import Operator, SparsePauliOp, Statevector
+from qiskit.circuit.library import PauliEvolutionGate, UCRXGate, UCRZGate
+from qiskit.quantum_info import Operator
 from qiskit.synthesis import SuzukiTrotter
-from scipy.sparse.linalg import expm_multiply
 
-from QuantumFields.gauge_field import (PLAQ_PAULIS, RK_PAULIS, GaussLaw,
-                                       QuantumLinkModel, field_signs, pauli_label)
+from QuantumFields.gauge_field import (FLIP_FROM, FLIP_TO, PLAQ_PAULIS, RK_PAULIS,
+                                       QuantumLinkModel, field_signs)
 
 BASIS_GATES = ['cx', 'rz', 'sx', 'x']
+ZZ_BASIS_GATES = ['rzz', 'rz', 'sx', 'x']      # native parameterised ZZ, as on trapped ions
 
+
+# ---------------------------------------------------------------------------
+# Elementary rotations
+# ---------------------------------------------------------------------------
 
 def append_pauli_rotation(qc: QuantumCircuit, angle: float, qubits, paulis):
-    """Append exp(-i * angle * P), P = tensor product of `paulis` on `qubits`.
+    """Append exp(-i * angle * P), P the tensor product of `paulis` on `qubits`.
 
     Basis change to Z, CNOT ladder onto the last qubit, Rz(2*angle), undo.
-    Identity factors are skipped.
+    Identity factors are skipped; an all-identity P becomes a global phase.
     """
     active = [(q, p) for q, p in zip(qubits, paulis) if p != 'I']
     if not active:
@@ -62,34 +77,89 @@ def append_pauli_rotation(qc: QuantumCircuit, angle: float, qubits, paulis):
             qc.s(q)
 
 
-PLAQUETTE_SYNTHESIS = "ucr"      # "ucr" (compact, default) or "pauli" (eight ladders)
+def _two_level_frame(qubits, a, b):
+    """Pivot qubit, fan-out targets and control pattern for the pair (a, b).
+
+    CNOTs from the pivot (the first qubit where a and b differ) onto every
+    other differing qubit map both configurations to the same bits on all
+    qubits except the pivot. The pair then becomes the two pivot states,
+    selected by the remaining qubits ("controls") being in `pattern`.
+    """
+    differ = [k for k in range(len(qubits)) if a[k] != b[k]]
+    if not differ:
+        raise ValueError("the two configurations must differ")
+    p = differ[0]
+    targets = [qubits[k] for k in differ[1:]]
+    controls = [qubits[k] for k in range(len(qubits)) if k != p]
+    pattern = [(a[k] ^ a[p]) if k in differ else a[k]
+               for k in range(len(qubits)) if k != p]
+    return qubits[p], targets, controls, pattern
 
 
-def _fan(qc, plaquette, reverse=False):
-    """CNOT fan-out from the bottom link. It maps the two flippable
-    configurations (b,r,t,l) = (1,1,0,0), (0,0,1,1) onto (b, 0, 1, 1), b = 1, 0,
-    so U_p + U_p^dag becomes X_b controlled on (r, t, l) = (0, 1, 1)."""
-    b, r, t, l = plaquette
-    for x in ((l, t, r) if reverse else (r, t, l)):
-        qc.cx(b, x)
+def _pattern_index(pattern) -> int:
+    """Index of a control pattern for the uniformly controlled gates (first control = LSB)."""
+    return sum(bit << k for k, bit in enumerate(pattern))
 
 
-_FLIPPABLE_INDEX = 0 + 2 + 4         # control pattern r=0, t=1, l=1 (first control = LSB)
+def append_two_level_rotation(qc: QuantumCircuit, theta: float, qubits, a, b,
+                              ancilla: int = None):
+    """Append exp(-i theta (|a><b| + |b><a|)) on `qubits` (or with Z_anc (x) ...).
+
+    Cost on k qubits: 2(m - 1) fan CNOTs (m = number of differing bits) plus
+    one uniformly controlled rotation with k - 1 controls (2^(k-1) CNOTs before
+    optimisation). For a plaquette (k = 4, m = 4) this is 13 CNOTs after
+    transpilation; with the ancilla attached, 16.
+    """
+    pivot, targets, controls, pattern = _two_level_frame(list(qubits), a, b)
+    angles = [0.0] * (2 ** len(controls))
+    angles[_pattern_index(pattern)] = 2.0 * theta
+    for t in targets:
+        qc.cx(pivot, t)
+    if ancilla is None:
+        qc.append(UCRXGate(angles), [pivot] + controls)
+    else:                                   # Z_anc X_p = H_p CX(anc, p) Z_p CX(anc, p) H_p
+        qc.h(pivot)
+        qc.cx(ancilla, pivot)
+        qc.append(UCRZGate(angles), [pivot] + controls)
+        qc.cx(ancilla, pivot)
+        qc.h(pivot)
+    for t in reversed(targets):
+        qc.cx(pivot, t)
+
+
+def append_two_level_phase(qc: QuantumCircuit, theta: float, qubits, a, b,
+                           ancilla: int = None):
+    """Append exp(-i theta (|a><a| + |b><b|)) on `qubits` (or with Z_anc (x) ...)."""
+    pivot, targets, controls, pattern = _two_level_frame(list(qubits), a, b)
+    for t in targets:
+        qc.cx(pivot, t)
+    if ancilla is None:                     # phase exp(-i theta) when controls = pattern
+        flips = [c for c, bit in zip(controls, pattern) if bit == 0]
+        for c in flips:
+            qc.x(c)
+        if len(controls) == 1:
+            qc.p(-theta, controls[0])
+        else:
+            qc.mcp(-theta, controls[:-1], controls[-1])
+        for c in flips:
+            qc.x(c)
+    else:                                   # exp(-i theta Z_anc) on that pattern
+        angles = [0.0] * (2 ** len(controls))
+        angles[_pattern_index(pattern)] = 2.0 * theta
+        qc.append(UCRZGate(angles), [ancilla] + controls)
+    for t in reversed(targets):
+        qc.cx(pivot, t)
 
 
 def append_plaquette_rotation(qc: QuantumCircuit, theta: float, plaquette,
-                              ancilla: int = None, method: str = None):
-    """Append exp(-i theta (U_p + U_p^dag)), exactly.
+                              ancilla: int = None, method: str = "ucr"):
+    """Append exp(-i theta (U_p + U_p^dag)) on the (b, r, t, l) link qubits, exactly.
 
-    method="ucr"    fan-out, one uniformly controlled rotation, fan-in:
-                    13 CNOTs, or 16 with the RQSVT ancilla attached.
-    method="pauli"  the eight commuting Pauli-string rotations of the draft
-                    (CNOT ladders): 17 CNOTs after transpilation, 40 with ancilla.
-    Both are exact and gauge invariant (a single Pauli string is not). With
-    `ancilla` the generator is Z_anc (x) (U_p + U_p^dag), the RQSVT signal
-    operator; no controlled time evolution is needed.
+    method="ucr"    two-level rotation: 13 CNOTs, or 16 with the ancilla.
+    method="pauli"  the eight commuting Pauli-string rotations of the expansion
+                    (CNOT ladders): 17 CNOTs after transpilation, 40 with the
+                    ancilla. Kept as the comparison baseline.
     """
-    method = method or PLAQUETTE_SYNTHESIS
     if method == "pauli":
         for label, sign in PLAQ_PAULIS:
             qubits, paulis = list(plaquette), list(label)
@@ -99,25 +169,12 @@ def append_plaquette_rotation(qc: QuantumCircuit, theta: float, plaquette,
         return
     if method != "ucr":
         raise ValueError(f"unknown plaquette synthesis {method!r}")
-    b, r, t, l = plaquette
-    angles = [0.0] * 8
-    angles[_FLIPPABLE_INDEX] = 2.0 * theta
-    _fan(qc, plaquette)
-    if ancilla is None:
-        qc.append(UCRXGate(angles), [b, r, t, l])
-    else:                                   # Z_anc X_b = H_b CX(anc,b) Z_b CX(anc,b) H_b
-        qc.h(b)
-        qc.cx(ancilla, b)
-        qc.append(UCRZGate(angles), [b, r, t, l])
-        qc.cx(ancilla, b)
-        qc.h(b)
-    _fan(qc, plaquette, reverse=True)
+    append_two_level_rotation(qc, theta, plaquette, FLIP_FROM, FLIP_TO, ancilla)
 
 
 def append_flippability_rotation(qc: QuantumCircuit, theta: float, plaquette,
-                                 ancilla: int = None, method: str = None):
-    """Append exp(-i theta (U_p + U_p^dag)^2) (diagonal RK term)."""
-    method = method or PLAQUETTE_SYNTHESIS
+                                 ancilla: int = None, method: str = "ucr"):
+    """Append exp(-i theta (U_p + U_p^dag)^2), the Rokhsar-Kivelson term."""
     if method == "pauli":
         for label, sign in RK_PAULIS:
             qubits, paulis = list(plaquette), list(label)
@@ -125,18 +182,17 @@ def append_flippability_rotation(qc: QuantumCircuit, theta: float, plaquette,
                 qubits, paulis = qubits + [ancilla], paulis + ['Z']
             append_pauli_rotation(qc, sign * theta / 8.0, qubits, paulis)
         return
-    b, r, t, l = plaquette
-    angles = [0.0] * 8
-    angles[_FLIPPABLE_INDEX] = 2.0 * theta
-    _fan(qc, plaquette)
-    if ancilla is None:                     # phase exp(-i theta) on (r,t,l) = (0,1,1)
-        qc.x(r)
-        qc.mcp(-theta, [r, t], l)
-        qc.x(r)
-    else:                                   # exp(-i theta Z_anc) on that pattern
-        qc.append(UCRZGate(angles), [ancilla, r, t, l])
-    _fan(qc, plaquette, reverse=True)
+    append_two_level_phase(qc, theta, plaquette, FLIP_FROM, FLIP_TO, ancilla)
 
+
+def append_hopping_rotation(qc: QuantumCircuit, theta: float, qubits, ancilla: int = None):
+    """Append exp(-i theta (phi^dag_a S^+_l phi_b + h.c.)) on (matter a, link l, matter b)."""
+    append_two_level_rotation(qc, theta, qubits, (0, 1, 1), (1, 0, 0), ancilla)
+
+
+# ---------------------------------------------------------------------------
+# Resource counting
+# ---------------------------------------------------------------------------
 
 def two_qubit_depth(qc: QuantumCircuit) -> int:
     return qc.depth(lambda inst: inst.operation.num_qubits == 2)
@@ -148,7 +204,7 @@ def two_qubit_count(qc: QuantumCircuit) -> int:
 
 def circuit_resources(qc: QuantumCircuit, basis_gates=None,
                       optimization_level: int = 3) -> dict:
-    """Transpile and report the counts used in the resource analysis (Sec. 2.3.6)."""
+    """Transpile to `basis_gates` (default {cx, rz, sx, x}) and count gates."""
     tqc = transpile(qc, basis_gates=basis_gates or BASIS_GATES,
                     optimization_level=optimization_level)
     n2 = two_qubit_count(tqc)
@@ -158,6 +214,10 @@ def circuit_resources(qc: QuantumCircuit, basis_gates=None,
             'two_qubit_depth': two_qubit_depth(tqc),
             'depth': tqc.depth()}
 
+
+# ---------------------------------------------------------------------------
+# Trotter steps
+# ---------------------------------------------------------------------------
 
 class TrotterEvolution:
     """Generic Suzuki-Trotter evolution of an arbitrary SparsePauliOp (baseline)."""
@@ -179,48 +239,53 @@ class TrotterEvolution:
         return qc
 
 
+def palindromic_schedule(n_layers: int, order: int) -> list:
+    """(sublayer index, fraction of dt) for one step of the given order.
+
+    order=1:  each sublayer once with the full time step;
+    order=2:  symmetric (Strang) sequence, half steps on all but the last
+              sublayer, applied forward and then backward.
+    """
+    if order == 1:
+        return [(k, 1.0) for k in range(n_layers)]
+    if order != 2:
+        raise ValueError("order must be 1 or 2")
+    return ([(k, 0.5) for k in range(n_layers - 1)] + [(n_layers - 1, 1.0)]
+            + [(k, 0.5) for k in reversed(range(n_layers - 1))])
+
+
 class StructuredTrotter:
-    """One structured Trotter step of duration dt.
+    """One structured Trotter step of duration dt for the pure-gauge cylinder.
 
         exp(-i dt H_diag / 2) . prod_c exp(-i dt H_B^(c)) . exp(-i dt H_diag / 2)
 
-    H_diag = H_E + H_RK is diagonal; H_B^(c) collects the plaquettes of colour c.
-    order=1 applies the colours once (error O(dt^2) per step, O(dt) overall);
-    order=2 applies them palindromically with half steps (O(dt^2) overall).
-    For the uniform field [H_E, H_B] = 0, so the only Trotter error comes from
-    plaquette sublayers that share links across colours.
+    H_diag = H_E + H_RK is diagonal and H_B^(c) collects the plaquettes of
+    colour c. With order=1 the error per step is O(dt^2) (global O(dt)); with
+    order=2 the colour sequence is palindromic and the global error is O(dt^2).
+    The diagonal layers are split symmetrically in both cases. For the uniform
+    field [H_E, H_B] = 0, so the only Trotter error comes from plaquettes of
+    different colours that share links.
     """
 
     def __init__(self, lattice, g=0.0, J=1.0, dt=0.05, rk=0.0,
                  field_pattern="uniform", order: int = 1, colouring="auto",
-                 synthesis: str = None):
-        if order not in (1, 2):
-            raise ValueError("order must be 1 or 2")
+                 synthesis: str = "ucr"):
         self.lattice = lattice
         self.n_qubits = lattice.n_qubits
         self.g, self.J, self.rk, self.dt = g, J, rk, dt
         self.order = order
-        self.synthesis = synthesis          # None -> PLAQUETTE_SYNTHESIS
+        self.synthesis = synthesis
         self.signs = field_signs(lattice, field_pattern)
         self.plaq_sublayers = lattice.get_plaquette_sublayers(colouring)
-        self.electric_qubits = lattice.get_electric_qubits()
+        self.schedule = palindromic_schedule(len(self.plaq_sublayers), order)
 
     def build_step(self, barriers: bool = True) -> QuantumCircuit:
         qc = QuantumCircuit(self.n_qubits)
         self._apply_diagonal_layer(qc, 0.5)
         if barriers:
             qc.barrier()
-        if self.order == 1:
-            for layer in self.plaq_sublayers:
-                self._apply_plaquette_sublayer(qc, layer, 1.0)
-                if barriers:
-                    qc.barrier()
-        else:
-            for layer in self.plaq_sublayers[:-1]:
-                self._apply_plaquette_sublayer(qc, layer, 0.5)
-            self._apply_plaquette_sublayer(qc, self.plaq_sublayers[-1], 1.0)
-            for layer in reversed(self.plaq_sublayers[:-1]):
-                self._apply_plaquette_sublayer(qc, layer, 0.5)
+        for k, fraction in self.schedule:
+            self._apply_plaquette_sublayer(qc, self.plaq_sublayers[k], fraction)
             if barriers:
                 qc.barrier()
         self._apply_diagonal_layer(qc, 0.5)
@@ -247,7 +312,7 @@ class StructuredTrotter:
         angle on link l is -g s_l dt f.
         """
         if self.g != 0.0:
-            for q in self.electric_qubits:
+            for q in range(self.n_qubits):
                 qc.rz(-self.g * self.signs[q] * self.dt * fraction, q)
         if self.rk != 0.0:
             for layer in self.plaq_sublayers:
@@ -255,9 +320,77 @@ class StructuredTrotter:
                     append_flippability_rotation(
                         qc, self.rk * self.dt * fraction, plaquette, method=self.synthesis)
 
-    # backwards-compatible name
-    def _apply_electric_layer(self, qc, fraction=1.0):
-        self._apply_diagonal_layer(qc, fraction)
+
+class MatterTrotter:
+    """Structured Trotter step for the matter-coupled model (Joshi et al. 2026).
+
+        exp(-i dt H_diag / 2) . prod_k exp(-i dt H^(k)) . exp(-i dt H_diag / 2)
+
+    H_diag = mass + electric term (single-qubit Z rotations). H^(k), k = 1..4,
+    are the four sublayers of OpenLattice.sublayers(): one hopping matching
+    plus one class of plaquettes, all acting on disjoint qubits. The circuit
+    equals the product of exponentials of the ScalarQEDModel terms exactly,
+    global phase included.
+    """
+
+    def __init__(self, lattice, kappa=1.0, m=0.0, g=0.0, J=0.0, dt=0.05, order: int = 1):
+        self.lattice = lattice
+        self.n_qubits = lattice.n_qubits
+        self.kappa, self.m, self.g, self.J, self.dt = kappa, m, g, J, dt
+        self.order = order
+        self.sublayers = [layer for layer in lattice.sublayers()
+                          if any(kind == 'hop' and kappa != 0.0 or kind == 'plaq' and J != 0.0
+                                 for kind, _ in layer)]
+        self.schedule = palindromic_schedule(len(self.sublayers), order)
+        self._hops = lattice.hopping_terms()
+        self._plaqs = lattice.get_plaquettes()
+
+    def build_step(self, barriers: bool = False) -> QuantumCircuit:
+        qc = QuantumCircuit(self.n_qubits)
+        self._apply_diagonal_layer(qc, 0.5)
+        for k, fraction in self.schedule:
+            if barriers:
+                qc.barrier()
+            self._apply_sublayer(qc, self.sublayers[k], fraction)
+        if barriers:
+            qc.barrier()
+        self._apply_diagonal_layer(qc, 0.5)
+        return qc
+
+    def build_evolution(self, n_steps: int, initial_bits: int = None) -> QuantumCircuit:
+        qc = QuantumCircuit(self.n_qubits)
+        if initial_bits is not None:
+            for q in range(self.n_qubits):
+                if (initial_bits >> q) & 1:
+                    qc.x(q)
+        step = self.build_step()
+        for _ in range(n_steps):
+            qc.compose(step, inplace=True)
+        return qc
+
+    def _apply_sublayer(self, qc, layer, fraction):
+        lat = self.lattice
+        for kind, idx in layer:
+            if kind == 'hop' and self.kappa != 0.0:
+                link, a, b, sign = self._hops[idx]
+                append_hopping_rotation(qc, -self.kappa * sign * self.dt * fraction,
+                                        (lat.matter_qubit(*a), link, lat.matter_qubit(*b)))
+            elif kind == 'plaq' and self.J != 0.0:
+                append_plaquette_rotation(qc, self.J * self.dt * fraction, self._plaqs[idx])
+
+    def _apply_diagonal_layer(self, qc, fraction):
+        """Mass m s_j (1 - Z_j)/2 and electric -(g/2) Z_l as Z rotations."""
+        lat = self.lattice
+        tau = self.dt * fraction
+        if self.g != 0.0:
+            for link in range(lat.n_links):
+                qc.rz(-self.g * tau, link)
+        if self.m != 0.0:
+            for s in range(lat.n_sites):
+                i, j = lat.site_coords(s)
+                sign = lat.parity(i, j)
+                qc.rz(-self.m * sign * tau, lat.matter_qubit(i, j))
+                qc.global_phase -= 0.5 * self.m * sign * tau
 
 
 def trotter_error(lattice, g, J, dt, rk=0.0, field_pattern="uniform",
@@ -270,134 +403,3 @@ def trotter_error(lattice, g, J, dt, rk=0.0, field_pattern="uniform",
                              field_pattern=field_pattern, order=order,
                              colouring=colouring).build_step(barriers=False)
     return float(np.linalg.norm(Operator(step).data - expm(-1j * dt * H), 2))
-
-
-class DynamicalSimulation:
-    """Exact statevector evolution under H with gauge-theory observables."""
-
-    def __init__(self, hamiltonian, lattice, g=0.0, J=1.0, rk=0.0,
-                 field_pattern="uniform", plates="free", plate_charges=None,
-                 total_time=20.0, n_steps=400, initial_state=None,
-                 use_structured_trotter=True):
-        self.hamiltonian = hamiltonian
-        self.lattice = lattice
-        self.n_qubits = lattice.n_qubits
-        self.total_time = total_time
-        self.n_steps = n_steps
-        self.dt = total_time / n_steps
-        self.initial_state = initial_state
-        self.use_structured_trotter = use_structured_trotter
-        self._g, self._J, self._rk = g, J, rk
-        self._field_pattern = field_pattern
-
-        self._H_sparse = hamiltonian.to_matrix(sparse=True)
-        gauss = GaussLaw(lattice, plates=plates, plate_charges=plate_charges)
-        self._gauss_sparse = [G.to_matrix(sparse=True)
-                              for G in gauss.build_gauss_operators() if G is not None]
-        self._H_B_sparse = QuantumLinkModel(lattice, J=J).build_magnetic_term() \
-            .to_matrix(sparse=True)
-        self._efield_ops_sparse = [
-            SparsePauliOp([pauli_label(self.n_qubits, [q], 'Z')], coeffs=[0.5])
-            .to_matrix(sparse=True) for q in lattice.get_electric_qubits()]
-
-    def run(self, verbose=True):
-        if self.initial_state is not None:
-            sv = np.asarray(self.initial_state, dtype=complex).copy()
-        else:
-            sv = np.zeros(2 ** self.n_qubits, dtype=complex)
-            sv[0] = 1.0
-
-        def measure(state):
-            return ((np.conj(state) @ (self._H_sparse @ state)).real,
-                    self._max_gauss_violation(state),
-                    self._plaquette_expectation(state),
-                    self._electric_field_profile(state))
-
-        records = [measure(sv)]
-        if verbose:
-            print(f"{'t':>6s}  {'<H>':>12s}  {'Gauss viol':>12s}  {'<H_B>':>10s}")
-            print(f"{0.0:6.3f}  {records[0][0]:12.6f}  {records[0][1]:12.2e}  "
-                  f"{records[0][2]:10.6f}")
-
-        generator = -1j * self.dt * self._H_sparse
-        for step in range(1, self.n_steps + 1):
-            sv = expm_multiply(generator, sv)
-            records.append(measure(sv))
-            if verbose and (step % max(1, self.n_steps // 10) == 0
-                            or step == self.n_steps):
-                e, gv, pl, _ = records[-1]
-                print(f"{step * self.dt:6.3f}  {e:12.6f}  {gv:12.2e}  {pl:10.6f}")
-
-        return {'times': self.dt * np.arange(self.n_steps + 1),
-                'energies': np.array([r[0] for r in records]),
-                'gauss_violations': np.array([r[1] for r in records]),
-                'plaquette_values': np.array([r[2] for r in records]),
-                'e_field_profiles': np.array([r[3] for r in records]),
-                'final_state': sv}
-
-    def run_trotter(self, n_steps=None) -> np.ndarray:
-        """Statevector after n_steps structured Trotter steps (noiseless)."""
-        n_steps = self.n_steps if n_steps is None else n_steps
-        trotter = StructuredTrotter(self.lattice, g=self._g, J=self._J, rk=self._rk,
-                                    dt=self.dt, field_pattern=self._field_pattern)
-        if self.initial_state is not None:
-            sv = Statevector(np.asarray(self.initial_state, dtype=complex))
-        else:
-            sv = Statevector.from_label('0' * self.n_qubits)
-        return sv.evolve(trotter.build_evolution(n_steps)).data
-
-    def run_on_backend(self, backend, shots=4096, time_points=None):
-        """<S^z_l>(t) on hardware through the runtime Estimator.
-
-        Not exercised by the test-suite (it needs IBM Quantum credentials).
-        """
-        from qiskit_ibm_runtime import EstimatorV2 as Estimator
-
-        estimator = Estimator(mode=backend)
-        estimator.options.resilience_level = 1
-        estimator.options.default_shots = shots
-
-        # little-endian labels: qubit q is character N_q - 1 - q of the label
-        observables = [SparsePauliOp([pauli_label(self.n_qubits, [q], 'Z')],
-                                     coeffs=[0.5]) for q in range(self.n_qubits)]
-        if time_points is None:
-            time_points = sorted({0, self.n_steps // 4, self.n_steps // 2,
-                                  self.n_steps})
-
-        if self.use_structured_trotter:
-            step_circuit = StructuredTrotter(
-                self.lattice, g=self._g, J=self._J, rk=self._rk, dt=self.dt,
-                field_pattern=self._field_pattern).build_step(barriers=False)
-        else:
-            step_circuit = TrotterEvolution(self.hamiltonian, self.n_qubits,
-                                            total_time=self.dt, n_steps=1
-                                            ).build_circuit().decompose(reps=5)
-
-        results = {}
-        for n_step in time_points:
-            qc = QuantumCircuit(self.n_qubits)
-            if self.initial_state is not None:
-                qc.append(StatePreparation(self.initial_state), range(self.n_qubits))
-            for _ in range(n_step):
-                qc.compose(step_circuit, inplace=True)
-            isa = transpile(qc, backend, optimization_level=3)
-            mapped = [obs.apply_layout(isa.layout) for obs in observables]
-            result = estimator.run([(isa, mapped)]).result()
-            t = n_step * self.dt
-            results[t] = {'e_field': [float(v) for v in result[0].data.evs],
-                          'depth': isa.depth(),
-                          'two_qubit_gates': two_qubit_count(isa)}
-            print(f"t={t:.2f}  depth={results[t]['depth']}  "
-                  f"2q_gates={results[t]['two_qubit_gates']}")
-        return results
-
-    def _max_gauss_violation(self, sv) -> float:
-        return max((float(np.linalg.norm(G @ sv)) for G in self._gauss_sparse),
-                   default=0.0)
-
-    def _electric_field_profile(self, sv) -> list:
-        return [float((np.conj(sv) @ (op @ sv)).real)
-                for op in self._efield_ops_sparse]
-
-    def _plaquette_expectation(self, sv) -> float:
-        return float((np.conj(sv) @ (self._H_B_sparse @ sv)).real)

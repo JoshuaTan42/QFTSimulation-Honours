@@ -1,59 +1,59 @@
-"""Pure-gauge U(1) quantum link model: Hamiltonian and Gauss's law.
+"""Pure-gauge U(1) quantum link model on the cylinder: Hamiltonian and Gauss's law.
 
-Hamiltonian (Joshi et al. 2026, Eq. 1 with the matter sector removed, plus an
-optional Rokhsar-Kivelson term):
+Hamiltonian (the model of Joshi et al. 2026, Eq. 1, without the matter field,
+plus an optional Rokhsar-Kivelson term):
 
     H = -g sum_l s_l S^z_l  +  J sum_p (U_p + U_p^dag)  +  lam_RK sum_p (U_p + U_p^dag)^2
         \\______ H_E _____/     \\________ H_B ________/     \\____________ H_RK ___________/
 
-Encoding (spin-1/2 truncation, one qubit per link, |0> = S^z = +1/2):
+Encoding (spin-1/2 quantum links, one qubit per link, |0> = S^z = +1/2):
     electric field      S^z = Z/2
     gauge connection    S^+ = (X + iY)/2 = |0><1|,  S^- = (X - iY)/2
     plaquette           U_p = S^+_b S^+_r S^-_t S^-_l   (bottom, right, top, left)
 
 Electric term. The quadratic energy (g^2/2) sum (S^z)^2 is a constant for
-spin 1/2, so Joshi et al. add a *linear* term. Two sign patterns s_l:
+spin 1/2, so the electric coupling enters through a linear term. Two sign
+patterns s_l are provided:
 
-  "uniform"    s_l = +1. This is Joshi's term. With matter it produces string
-               tension. In the PURE-GAUGE model it commutes with every plaquette
+  "uniform"    s_l = +1, the term of Joshi et al. With matter it produces a
+               string tension. Without matter it commutes with every plaquette
                operator, [sum_l S^z_l, U_p] = (1 + 1 - 1 - 1) U_p = 0
                (proofs/GaugeInvariance.lean), so it is a conserved chemical
-               potential for total flux and generates no dynamics of its own.
+               potential for the total flux and generates no dynamics.
   "staggered"  s_l = -(-1)^(i+j) on horizontal and +(-1)^(i+j) on vertical
-               links. [H_E, U_p] = -4 g (-1)^(i+j) U_p is non-zero on every
-               plaquette, giving genuine electric dynamics. Translation
-               invariant along x only for even W.
+               links. Then [H_E, U_p] = -4 g (-1)^(i+j) U_p on every plaquette,
+               which gives genuine electric dynamics. Translation invariant
+               along x only for even W.
 
-Every term is diagonal in S^z or built from U_p, hence commutes with every
-Gauss generator G_j, including the generators on the plate rows.
+Every term is diagonal in S^z or built from U_p, so it commutes with every
+Gauss generator G_j, including those on the plate rows.
 
 Gauss's law and the plates.
-    G_j = sum_{links at j} (+-) S^z  -  q_j,       physical states: G_j |psi> = 0.
+    G_j = sum_{links at j} (+-) S^z  -  q_j,      physical states: G_j |psi> = 0.
 Interior sites have four links and q_j = 0. Plate sites have three links, so
-sum(+-)S^z is half-integer there and q_j must be +-1/2 or +-3/2: a spin-1/2
-plate site necessarily carries a static charge. Two plate models:
+the divergence is half-integer there and q_j must be +-1/2 or +-3/2: with
+spin-1/2 links every plate site carries a static charge. Two plate models:
 
-  plates="free"   no constraint on plate rows. The plate charges are conserved
-                  but unconstrained, so the Hilbert space is the direct sum of
-                  all static plate-charge sectors and the ground state picks the
+  plates="free"   no constraint on the plate rows. The plate charges are still
+                  conserved, so the Hilbert space is the direct sum of all
+                  static plate-charge sectors and the ground state selects the
                   energetically best induced-charge pattern (ideal conductor).
-  plates="fixed"  G_j = 0 enforced on plate rows with prescribed charges. The
-                  default pattern is staggered, q_(i,j) = (1/2) (-1)^(i+j),
+  plates="fixed"  G_j = 0 enforced on the plate rows with prescribed charges.
+                  The default pattern is staggered, q_(i,j) = (1/2)(-1)^(i+j),
                   which needs even W; pass `plate_charges` for anything else.
 
-Pauli labels use the index transform q -> N_q - 1 - q so that qubit q lands in
-the right position under Qiskit's little-endian ordering.
+Pauli labels are little-endian (Qiskit convention): qubit q is character
+N_q - 1 - q of the label string.
 """
 
 from __future__ import annotations
 
 import numpy as np
-from qiskit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
 
 
-# Eight-Pauli-string expansion  U_p + U_p^dag = (1/8) sum_k sign_k P_k
-# (proofs/PlaquettePauli.lean checks this identity entry by entry).
+# U_p + U_p^dag = (1/8) sum_k sign_k P_k on the qubits (b, r, t, l);
+# proofs/PlaquettePauli.lean checks this identity entry by entry.
 PLAQ_PAULIS = [
     ("XXXX", +1.0),
     ("XXYY", -1.0),
@@ -65,8 +65,8 @@ PLAQ_PAULIS = [
     ("YYYY", +1.0),
 ]
 
-# (U_p + U_p^dag)^2 = projector onto flippable plaquettes
-#                   = (1/8) [1 + Z_b Z_r + Z_t Z_l - Z_b Z_t - Z_b Z_l - Z_r Z_t - Z_r Z_l + Z_b Z_r Z_t Z_l]
+# (U_p + U_p^dag)^2 is the projector onto the two flippable configurations:
+# (1/8) [1 + Z_b Z_r + Z_t Z_l - Z_b Z_t - Z_b Z_l - Z_r Z_t - Z_r Z_l + Z_b Z_r Z_t Z_l]
 RK_PAULIS = [
     ("IIII", +1.0),
     ("ZZII", +1.0),
@@ -77,6 +77,11 @@ RK_PAULIS = [
     ("IZIZ", -1.0),
     ("ZZZZ", +1.0),
 ]
+
+# The two flippable configurations of (b, r, t, l), as qubit bits (1 = S^z -1/2).
+# U_p maps FLIP_FROM to FLIP_TO and annihilates every other configuration.
+FLIP_FROM = (1, 1, 0, 0)
+FLIP_TO = (0, 0, 1, 1)
 
 FIELD_PATTERNS = ("uniform", "staggered")
 PLATE_MODES = ("free", "fixed")
@@ -90,7 +95,7 @@ def pauli_label(n_qubits: int, qubits, paulis) -> str:
     return ''.join(full)
 
 
-def _zero_op(n_qubits: int) -> SparsePauliOp:
+def zero_operator(n_qubits: int) -> SparsePauliOp:
     return SparsePauliOp(['I' * n_qubits], coeffs=[0.0])
 
 
@@ -105,6 +110,11 @@ def field_signs(lattice, pattern: str = "uniform") -> np.ndarray:
             parity = (-1) ** (i + j)
             signs[q] = -parity if direction == 'x' else parity
     return signs
+
+
+def default_plates(width: int) -> str:
+    """Fixed staggered plate charges for even W; free (induced) charges for odd W."""
+    return "fixed" if width % 2 == 0 else "free"
 
 
 def staggered_plate_charges(lattice) -> dict:
@@ -152,7 +162,7 @@ class GaussLaw:
         return SparsePauliOp(labels, coeffs=coeffs).simplify()
 
     def generator(self, i: int, j: int) -> SparsePauliOp:
-        """G_j = div E - q_j for any site, constrained or not."""
+        """G_j = div E - q_j (defined for every site, constrained or not)."""
         op = self.divergence_operator(i, j)
         q = self.charge(i, j)
         if q != 0.0:
@@ -172,50 +182,25 @@ class GaussLaw:
         terms = [(G @ G).simplify() for G in self.build_gauss_operators()
                  if G is not None]
         if not terms or lam == 0.0:
-            return _zero_op(self.n_qubits)
+            return zero_operator(self.n_qubits)
         return (lam * sum(terms[1:], terms[0])).simplify()
 
-    def get_initial_circuit(self) -> QuantumCircuit:
-        """Equal superposition over link qubits (Hadamard on every link)."""
-        qc = QuantumCircuit(self.n_qubits)
-        for link_q in self.lattice.get_electric_qubits():
-            qc.h(link_q)
-        return qc
-
     def max_violation(self, sv: np.ndarray) -> float:
-        """max_j || G_j |psi> || over constrained sites."""
+        """max_j || G_j |psi> || over the constrained sites (0 for a physical state)."""
         worst = 0.0
         for G in self.build_gauss_operators():
             if G is not None:
                 worst = max(worst, float(np.linalg.norm(G.to_matrix(sparse=True) @ sv)))
         return worst
 
-    def verify(self, sv: np.ndarray, tol: float = 1e-6, verbose: bool = True) -> bool:
-        """Check max_j ||G_j |psi>|| <= tol, i.e. the state is gauge invariant."""
-        violations = []
-        worst = 0.0
-        for idx, G in enumerate(self.build_gauss_operators()):
-            if G is None:
-                continue
-            viol = float(np.linalg.norm(G.to_matrix(sparse=True) @ sv))
-            worst = max(worst, viol)
-            if viol > tol:
-                violations.append((*self.lattice.site_to_coords(idx), viol))
-        if verbose:
-            if not violations:
-                print(f"Gauss law satisfied (max violation = {worst:.2e})")
-            else:
-                print(f"[!] Gauss law violated at {len(violations)} sites "
-                      f"(max = {worst:.2e})")
-                for i, j, v in violations:
-                    print(f"   Site ({i},{j}): {v:.2e}")
-        return not violations
-
 
 class QuantumLinkModel:
-    """Qubit Hamiltonian of the pure-gauge spin-1/2 U(1) quantum link model."""
+    """Qubit Hamiltonian of the pure-gauge spin-1/2 U(1) quantum link model.
 
-    _PLAQ_PAULIS = PLAQ_PAULIS          # kept for backwards compatibility
+    The Gauss-law penalty (gauss_penalty > 0) is only needed when the
+    Hamiltonian is diagonalised in the full 2^N_q qubit space as a cross-check.
+    The quantum circuits and the sector reference never use it.
+    """
 
     def __init__(self, lattice, g: float = 0.0, J: float = 1.0, rk: float = 0.0,
                  gauss_penalty: float = 0.0, field_pattern: str = "uniform",
@@ -235,15 +220,13 @@ class QuantumLinkModel:
     def build_electric_term(self) -> SparsePauliOp:
         """H_E = -g sum_l s_l S^z_l = -(g/2) sum_l s_l Z_l."""
         if self.g == 0.0:
-            return _zero_op(self.n_qubits)
-        labels = [pauli_label(self.n_qubits, [q], 'Z')
-                  for q in self.lattice.get_electric_qubits()]
-        coeffs = [-0.5 * self.g * self.field_signs[q]
-                  for q in self.lattice.get_electric_qubits()]
+            return zero_operator(self.n_qubits)
+        labels = [pauli_label(self.n_qubits, [q], 'Z') for q in range(self.n_qubits)]
+        coeffs = [-0.5 * self.g * self.field_signs[q] for q in range(self.n_qubits)]
         return SparsePauliOp(labels, coeffs=coeffs)
 
     def plaquette_operator(self, plaquette) -> SparsePauliOp:
-        """U_p + U_p^dag on one plaquette (norm 1, eigenvalues 0, +-1)."""
+        """U_p + U_p^dag on one plaquette (eigenvalues 0, +1, -1)."""
         labels = [pauli_label(self.n_qubits, plaquette, p) for p, _ in PLAQ_PAULIS]
         coeffs = [s / 8.0 for _, s in PLAQ_PAULIS]
         return SparsePauliOp(labels, coeffs=coeffs)
@@ -260,14 +243,14 @@ class QuantumLinkModel:
     def build_magnetic_term(self) -> SparsePauliOp:
         """H_B = J sum_p (U_p + U_p^dag): eight Pauli strings per plaquette."""
         if self.J == 0.0:
-            return _zero_op(self.n_qubits)
+            return zero_operator(self.n_qubits)
         ops = self.plaquette_operators()
         return (self.J * sum(ops[1:], ops[0])).simplify()
 
     def build_rk_term(self) -> SparsePauliOp:
-        """H_RK = lam_RK sum_p (U_p + U_p^dag)^2 (diagonal, counts flippable plaquettes)."""
+        """H_RK = lam_RK sum_p (U_p + U_p^dag)^2, diagonal: counts flippable plaquettes."""
         if self.rk == 0.0:
-            return _zero_op(self.n_qubits)
+            return zero_operator(self.n_qubits)
         ops = [self.flippability_operator(p) for p in self.lattice.get_plaquettes()]
         return (self.rk * sum(ops[1:], ops[0])).simplify()
 
@@ -287,13 +270,3 @@ class QuantumLinkModel:
         if self.gauss_penalty > 0:
             H = (H + self.build_gauss_penalty()).simplify()
         return H
-
-    def one_norm(self) -> float:
-        """lambda_H = sum of term norms at plaquette granularity (qDRIFT weight)."""
-        n_p = self.lattice.n_plaquettes
-        return (abs(self.J) * n_p + abs(self.rk) * n_p
-                + 0.5 * abs(self.g) * self.n_qubits)
-
-    # backwards-compatible helper
-    def _pauli_string_on_qubits(self, qubits, pauli_chars) -> str:
-        return pauli_label(self.n_qubits, qubits, pauli_chars)

@@ -14,13 +14,15 @@ Right   (a) energy density across the gap against the bulk reference,
 Bottom  sliders for W, d, J, g, lam_RK; radio buttons for the field pattern, the
         plate model and the view; buttons to run/pause a quench and save a PNG.
 
-"Quench" starts from the maximally flippable product state (the RQSVT initial
-state) and evolves it exactly under the current Hamiltonian, so the build-up of
-vacuum fluctuations between the plates can be watched directly.
+"Quench" starts from the most-flippable product state (the initial state of
+the ground-state filter and of the hardware quench) and evolves it exactly
+under the current Hamiltonian, so the build-up of vacuum fluctuations between
+the plates can be watched directly. The same quench is studied quantitatively
+in dynamics.py and run as a circuit by hardware.py.
 
 All numerics run in the gauge-invariant sector (sector.py), so the window stays
-responsive up to roughly 40 link qubits. The class is backend-agnostic: the
-test-suite drives it headlessly with the Agg backend.
+responsive up to roughly 40 link qubits. The class works with any matplotlib
+backend; the test-suite drives it headlessly with Agg.
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from __future__ import annotations
 import numpy as np
 
 from lattice import LatticeGrid
+from QuantumFields.gauge_field import default_plates
 from sector import GaugeSector
 
 MAX_DIM = 250_000          # largest sector the GUI will diagonalise
@@ -44,10 +47,9 @@ class CasimirModel:
 
     @staticmethod
     def resolve_plates(width, plates):
-        if plates == "auto":
-            return "fixed" if width % 2 == 0 else "free"
-        if plates == "fixed" and width % 2:
-            return "free"                         # staggered charges need even W
+        """"auto" picks the default plate model; fixed staggered charges need even W."""
+        if plates == "auto" or (plates == "fixed" and width % 2):
+            return default_plates(width)
         return plates
 
     def sector(self, W, H, plates):
@@ -81,6 +83,8 @@ class CasimirModel:
 
 
 class CasimirExplorer:
+    """The interactive window (sliders, radio buttons, quench animation)."""
+
     def __init__(self, fig=None, W=4, d=3, J=1.0, g=0.0, rk=0.0,
                  pattern="uniform", plates="auto"):
         import matplotlib.pyplot as plt
@@ -212,9 +216,7 @@ class CasimirExplorer:
             return
         idx = gs['support']
         Hs = gs['hamiltonian'][idx][:, idx]
-        flips = sum(sector.flippable(p)[idx] for p in range(sector.lattice.n_plaquettes))
-        cand = np.nonzero(flips == flips.max())[0]
-        k = cand[np.argmin(Hs.diagonal()[cand])]
+        k = sector.most_flippable(idx, Hs)
         psi0 = np.zeros(len(idx), dtype=complex)
         psi0[k] = 1.0
         self._gs_flip = float(sector.flippability(gs['state']).mean())
@@ -276,7 +278,9 @@ class CasimirExplorer:
         charges = sector.plate_charge_table().T @ (np.abs(vec) ** 2)
 
         quench = self.view == "quench"
-        tiles = flip if quench else p['J'] * plaq     # H is conserved, flippability is not
+        # During a quench the energy is conserved, so the tiles show the
+        # flippability, which does evolve; otherwise the magnetic energy density.
+        tiles = flip if quench else p['J'] * plaq
         self._draw_lattice(sector.lattice, efield, tiles, charges, title, light)
         self._draw_profile(sector.lattice, plaq, flip, plates, light)
         if not light:
@@ -292,7 +296,8 @@ class CasimirExplorer:
         self.fig.canvas.draw_idle()
 
     def _build_lattice(self, lat):
-        """Static scene plus the three dynamic artists (tiles, arrows, labels)."""
+        """Static scene plus the persistent artists (tiles, arrows, labels) that
+        later frames update in place instead of redrawing."""
         import matplotlib
         from matplotlib import cm, colors
         from matplotlib.collections import PatchCollection

@@ -1,4 +1,4 @@
-"""Casimir-energy extraction for the 2+1D U(1) quantum link model (thesis Sec. 2.3.5).
+"""Casimir-energy extraction for the 2+1D U(1) quantum link model.
 
 Pipeline
     1. ground-state energy E0(d) against plate separation d = H - 1 at fixed W,
@@ -6,9 +6,9 @@ Pipeline
     3. force by central difference  F(d) = -[E_Cas(d+1) - E_Cas(d-1)] / 2,
     4. model comparison for the decay of E_Cas.
 
-E0(d) comes from exact diagonalisation in the gauge-invariant sector (reference),
-optionally cross-checked by the penalised full-space Hamiltonian, by DMRG and by
-the RQSVT filter.
+E0(d) comes from exact diagonalisation in the gauge-invariant sector (the
+reference), optionally cross-checked by the penalised full-space Hamiltonian,
+by DMRG (tensor_network.py) and by the single-ancilla filter (rqsvt.py).
 
 What the fit can and cannot show. The continuum prediction F/L ~ -d^-3 assumes a
 massless photon and d much larger than the lattice spacing. Compact U(1) gauge
@@ -16,8 +16,8 @@ theory in 2+1D is confining, so at large d the residual must decay exponentially
 a power law can only appear as an intermediate regime (the spin-1/2 QLM at
 lam_RK = 0 has an unusually light pseudo-Goldstone mode, Banerjee et al. 2013,
 which makes that regime plausible but not guaranteed). With d <= 7 the two forms
-cannot be separated with confidence. The code therefore reports both fits with
-their residuals and a model-free second difference, and leaves the exponent as a
+cannot always be separated, so both fits are reported with their residuals,
+together with a model-free second difference, and the exponent is treated as a
 measured quantity rather than a verified one.
 
 Second difference. D2(d) = E0(d+1) - 2 E0(d) + E0(d-1) removes a + b d exactly
@@ -33,7 +33,7 @@ import numpy as np
 from scipy.sparse.linalg import eigsh
 
 from lattice import LatticeGrid
-from QuantumFields.gauge_field import QuantumLinkModel
+from QuantumFields.gauge_field import QuantumLinkModel, default_plates
 from sector import GaugeSector
 
 FULL_SPACE_MAX_QUBITS = 16
@@ -43,13 +43,9 @@ FULL_SPACE_MAX_QUBITS = 16
 # Ground-state energy by each method
 # ---------------------------------------------------------------------------
 
-def default_plates(width: int) -> str:
-    """Staggered fixed charges need even W; odd W uses free (induced) charges."""
-    return "fixed" if width % 2 == 0 else "free"
-
-
 def ground_energy_sector(width, height, g=0.0, J=1.0, rk=0.0,
                          field_pattern="uniform", plates=None) -> dict:
+    """Ground-state energy and in-sector gap from sector ED (the reference)."""
     lattice = LatticeGrid(width, height)
     plates = plates or default_plates(width)
     sector = GaugeSector(lattice, plates=plates)
@@ -81,6 +77,7 @@ def ground_energy_full(width, height, g=0.0, J=1.0, rk=0.0, field_pattern="unifo
 def ground_energy_rqsvt(width, height, g=0.0, J=1.0, rk=0.0, field_pattern="uniform",
                         plates=None, method="trotter", schedule=(1, 2, 4),
                         filter_kind="gaussian", n_circuits=1) -> dict:
+    """Ground-state energy from the emulated single-ancilla filter (Richardson-extrapolated)."""
     from rqsvt import RQSVTGroundState
     rq = RQSVTGroundState(LatticeGrid(width, height), g=g, J=J, rk=rk,
                           field_pattern=field_pattern,
@@ -177,6 +174,7 @@ def analyse(ds, E0s, d_min: int = 2) -> dict:
 def run_casimir_scan(width=4, separations=(1, 2, 3, 4, 5, 6), g=0.0, J=1.0, rk=0.0,
                      field_pattern="uniform", plates=None, cross_check=True,
                      verbose=True) -> dict:
+    """E0(d) over the separations at fixed W, with full-space cross-checks where small."""
     plates = plates or default_plates(width)
     if verbose:
         print("=" * 72)

@@ -1,4 +1,4 @@
-"""Tensor-network reference track for U(1) QLM ground states (thesis Sec. 2.3.2).
+"""Tensor-network reference for U(1) QLM ground states.
 
   * DMRG (quimb) on the penalised qubit Hamiltonian, with the 2D lattice mapped
     onto a 1D chain in link-qubit order. The Pauli-sum MPO is compressed before
@@ -6,9 +6,9 @@
   * MPS compression of exactly diagonalised ground states, as an entanglement
     diagnostic for how far the 1D mapping can be pushed.
 
-Sector ED (sector.py) is the primary classical reference. DMRG is the
-independent cross-check required by Sec. 2.4.2 and the route to lattices whose
-gauge-invariant sector no longer fits in memory.
+Sector ED (sector.py) is the primary classical reference. DMRG is an
+independent cross-check that shares no code with it, and the route to lattices
+whose gauge-invariant sector no longer fits in memory.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import warnings
 import numpy as np
 
 from lattice import LatticeGrid
-from QuantumFields.gauge_field import QuantumLinkModel
+from QuantumFields.gauge_field import QuantumLinkModel, default_plates
 from sector import GaugeSector
 
 _PAULI = {
@@ -67,8 +67,7 @@ def get_ground_state_dmrg(lattice, g=0.0, J=1.0, rk=0.0, field_pattern="uniform"
     """DMRG ground state with the bond dimension raised until the energy settles.
 
     The bond dimension is increased along `bond_schedule` until the relative
-    energy change between two consecutive schedule entries is below rel_tol
-    (the convergence rule of Sec. 2.3.2).
+    energy change between two consecutive schedule entries is below rel_tol.
     """
     qtn = _qtn()
     n = lattice.n_qubits
@@ -95,7 +94,7 @@ def get_ground_state_dmrg(lattice, g=0.0, J=1.0, rk=0.0, field_pattern="uniform"
 
 
 def validate_dmrg(lattice, g=0.0, J=1.0, rk=0.0, plates="free", verbose=True) -> dict:
-    """Classical-classical cross-check: sector ED against DMRG (Sec. 2.4.2, item 1)."""
+    """Classical cross-check: sector ED against DMRG on the penalised Hamiltonian."""
     exact = GaugeSector(lattice, plates=plates).ground_state(g=g, J=J, rk=rk)['energy']
     energy, state, info = get_ground_state_dmrg(lattice, g=g, J=J, rk=rk, plates=plates)
     rel = abs(energy - exact) / max(1.0, abs(exact))
@@ -133,10 +132,11 @@ def compress_and_measure(state_vector, n_qubits, chi_values) -> tuple:
 
 def run_compression_scan(lattice_sizes, chi_values=(2, 4, 8, 16, 32), J=1.0, rk=0.0,
                          verbose=True) -> list:
+    """Truncation error of the exact ground state as an MPS of bond dimension chi."""
     results = []
     for W, H in lattice_sizes:
         lattice = LatticeGrid(W, H)
-        plates = "fixed" if W % 2 == 0 else "free"
+        plates = default_plates(W)
         sector = GaugeSector(lattice, plates=plates)
         gs = sector.ground_state(J=J, rk=rk)
         bonds, errors = compress_and_measure(sector.embed(gs['state']),
