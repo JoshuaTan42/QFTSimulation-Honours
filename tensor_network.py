@@ -6,9 +6,10 @@
   * MPS compression of exactly diagonalised ground states, as an entanglement
     diagnostic for how far the 1D mapping can be pushed.
 
-Sector ED (sector.py) is the primary classical reference. DMRG is an
-independent cross-check that shares no code with it, and the route to lattices
-whose gauge-invariant sector no longer fits in memory.
+Sector ED (sector.py) is the primary classical reference. DMRG works on the
+penalised qubit Hamiltonian without the sector enumeration, so it is an
+independent cross-check, and the route to lattices whose gauge-invariant sector
+no longer fits in memory.
 """
 
 from __future__ import annotations

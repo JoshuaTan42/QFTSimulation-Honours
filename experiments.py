@@ -481,16 +481,16 @@ def quench_study(width=4, separations=(1, 2, 3, 4, 5), J=1.0, rk=0.0, t_max=20.0
         axes[0].plot(run['times'], run['return_probability'], color=colour, label=f"d={run['d']}")
         if run['entropy_midplane']:
             axes[1].plot(run['times'], run['entropy_midplane'], color=colour, label=f"d={run['d']}")
-        rows = np.arange(len(run['energy_density_long_time'])) + 0.5
-        axes[2].plot(rows / run['d'], np.array(run['energy_density_long_time'])
-                     - np.array(run['ground_state_profiles']['energy_density']),
+        rows = np.arange(len(run['flippability_long_time'])) + 0.5
+        axes[2].plot(rows / run['d'], np.array(run['flippability_long_time'])
+                     - np.array(run['ground_state_profiles']['flippability']),
                      'o-', color=colour, label=f"d={run['d']}")
     axes[0].set(xlabel="time", ylabel="return probability", title="(a) Loschmidt echo")
     axes[1].set(xlabel="time", ylabel="entanglement entropy across the midplane",
                 title="(b) entanglement growth")
     axes[2].set(xlabel="position across the gap y/d",
-                ylabel="late-time minus ground-state energy density",
-                title="(c) energy deposited by the quench, row by row")
+                ylabel="late-time minus ground-state flippability",
+                title="(c) plate imprint on the relaxed state, row by row")
     for ax in axes:
         ax.grid(alpha=0.3)
         ax.legend(fontsize=7)

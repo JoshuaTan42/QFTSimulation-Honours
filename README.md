@@ -1,39 +1,65 @@
 # Towards Optimized Casimir Simulations
 
-Pure-gauge U(1) quantum link model on a W x H cylinder: structured Trotter
-evolution, single-ancilla randomised QSVT ground-state preparation, and
-Casimir-energy extraction, with an exact gauge-sector reference and an
-interactive explorer.
+Quantum simulation of the Casimir effect in the 2+1D U(1) quantum link model
+(pure gauge, W x H cylinder, plates on the boundary rows). The package combines
+a structured Trotter decomposition (Joshi et al. 2026) with a single-ancilla
+spectral filter for ground-state preparation (Wang et al. 2025), and provides an
+exact gauge-sector reference, real-time quench dynamics between the plates,
+hardware-ready experiments, a benchmark on the matter-coupled model of Joshi et
+al., an interactive explorer and Lean 4 proofs of the structural results.
+
+Honours thesis, University of Technology Sydney. Supervisor: Dr. Christopher Ferrie.
+
+## Install and run
 
     pip install -r requirements.txt
-    python main.py              # full pipeline, ~90 s, writes results/summary.json
-    python main.py --quick      # small lattices only
-    python main.py --gui        # pop-up explorer (same as: python visualize.py)
-    python make_figures.py      # thesis figures from results/summary.json
-    python experiments.py all   # RK scan, filter scaling with d, noise study (~2 min)
-    python -m pytest -q         # 44 tests, ~40 s
-    LEAN=lean proofs/check.sh   # Lean 4 proofs (plain toolchain, no Mathlib)
+
+    python main.py                 # core pipeline -> results/summary.json  (a few minutes)
+    python main.py --quick         # small lattices only
+    python make_figures.py         # figures from results/summary.json
+    python experiments.py all      # every research study at default size
+    python experiments.py all --quick
+    python experiments.py <study> -h          # options of one study
+    python hardware.py quench --backend fake:kingston --dry-run
+    python joshi_benchmark.py      # benchmark against Joshi et al.
+    python main.py --gui           # interactive explorer (same as: python visualize.py)
+    python -m pytest -q            # test-suite
+    LEAN=lean proofs/check.sh      # Lean 4 proofs (plain toolchain, no Mathlib)
+
+`GUIDE.md` explains how the program works step by step and lists the
+experiments to run for the thesis, with the command for each.
+
+## Modules
 
 | module | role |
 |---|---|
-| `lattice.py` | geometry, link indexing, proper plaquette colouring (2 sublayers for even W, 3 for odd W) |
-| `QuantumFields/gauge_field.py` | Hamiltonian terms (electric uniform/staggered, plaquette, RK), Gauss law with free or fixed plate charges |
-| `sector.py` | exact diagonalisation in the gauge-invariant sector (no qubit limit; bounded by the sector dimension, see `count_states`), observables, dynamics |
-| `circuit.py` | exact plaquette gate (13 CNOTs; 16 with the RQSVT ancilla), structured Trotter step, resource counters |
-| `rqsvt.py` | GQSP angle finding, Fourier filters, single-ancilla filter driven by exact / Trotter / qDRIFT evolution, Richardson extrapolation, Qiskit circuit |
+| `lattice.py` | `LatticeGrid` (cylinder: link indexing, plaquettes, proper colouring with 2 sublayers for even W and 3 for odd W) and `OpenLattice` (open matter lattice of Joshi et al.) |
+| `QuantumFields/gauge_field.py` | pure-gauge Hamiltonian (uniform or staggered electric term, plaquette, Rokhsar-Kivelson) and Gauss's law with free or fixed plate charges |
+| `QuantumFields/matter_field.py` | matter-coupled model of Joshi et al.: hardcore bosons, gauge-matter hopping, staggered mass, static charges, string state |
+| `sector.py` | exact diagonalisation in the gauge-invariant sector of the cylinder (no qubit limit; `count_states` gives the dimension in advance) |
+| `matter_sector.py` | the same for the matter-coupled model (4x3: 1,826 states, 5x4: 636,487) |
+| `circuit.py` | exact two-level rotations (plaquette gate: 13 CNOTs, 16 with the filter ancilla; hopping gate: 7), structured Trotter steps for both models, resource counters |
+| `rqsvt.py` | GQSP angles, Fourier filters, single-ancilla filter driven by exact, Trotter (first or second order) or qDRIFT evolution, Richardson extrapolation, the Qiskit circuit |
 | `resources.py` | measured gate counts and the LCU block-encoding baseline |
 | `casimir.py` | E0(d), bulk subtraction, power-law and exponential fits, model-free second difference |
-| `tensor_compression.py` | DMRG (quimb, compressed MPO) and MPS compressibility |
-| `noise.py` | trajectory simulator for two-qubit depolarising noise, Gauss-law post-selection |
-| `experiments.py` | research drivers: RK scan, filter cost against d, noise study |
+| `dynamics.py` | quench dynamics: sector emulation of the Trotter circuits, return probability, row profiles, midplane entanglement, Trotter budget |
+| `hardware.py` | quench and filter experiments for an ideal simulator, an IBM device snapshot (`fake:kingston`) or IBM hardware, with Gauss-law post-selection |
+| `noise.py` | trajectory simulator for two-qubit depolarising noise |
+| `tensor_network.py` | DMRG (quimb) cross-check and MPS compressibility |
+| `experiments.py` | the research studies, each with command-line options |
+| `joshi_benchmark.py` | resources and string dynamics against Joshi et al. (2026) |
 | `visualize.py` | interactive explorer with sliders, radio buttons and a real-time quench |
+| `config.py` | standard parameters; `environment()` records package versions |
 | `proofs/` | Lean 4: link counts, gauge invariance, colouring, Pauli expansions, extraction identities |
+| `tests/` | `test_framework.py` (core), `test_matter.py`, `test_dynamics.py` |
 
-See `GUIDE.md` for a step-by-step walkthrough and the research protocol.
+## Conventions
 
-Conventions: qubit |0> is S^z = +1/2; basis-state integers are Qiskit statevector
-indices; Pauli labels are little-endian. Performance notes: all classical
-numerics run in the gauge sector (3x3: 21 states instead of 32768), operators
-are assembled once and cached, the RQSVT emulator uses precomputed dense
-rotations in small sectors, and the explorer updates persistent artists rather
-than redrawing.
+* Qubit |0> is S^z = +1/2; for matter qubits |1> is an occupied site.
+* Basis-state integers are Qiskit statevector indices (bit q = qubit q), and
+  Pauli labels are little-endian (qubit q is character N_q - 1 - q).
+* All classical numerics run in the gauge-invariant sector, never in 2^N_q.
+* Every gate count is measured on circuits built here, transpiled to
+  {cx, rz, sx, x} at optimisation level 3 (or to an explicit basis). Counts
+  depend on the Qiskit version, which is stored in every result file; compare
+  results only between runs with the same versions.

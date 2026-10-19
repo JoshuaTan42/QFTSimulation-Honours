@@ -24,6 +24,13 @@ quench
     entanglement entropy across the midplane between the plates, and the
     fidelity of Trotterised evolution for chosen time steps and orders.
 
+    With lam_RK = 0 and g = 0 the energy density <J (U_p + U_p^dag)> of every
+    plaquette stays exactly zero after a quench from a product state: the
+    diagonal operator prod Z over the horizontal links of even rows
+    anticommutes with every plaquette term (chiral symmetry), and together
+    with time reversal (H and the initial state are real) this forces
+    <h_p>(t) = -<h_p>(t). The flippability is the observable that evolves.
+
 quench_vs_separation, trotter_budget
     Drivers used by experiments.py.
 """
@@ -298,6 +305,8 @@ def quench_vs_separation(W=4, separations=(1, 2, 3, 4, 5), J=1.0, g=0.0, rk=0.0,
         run['echo_long_time'] = float(time_average(echo, t, t_max / 2))
         run['energy_density_long_time'] = time_average(run['energy_density'], t,
                                                        t_max / 2).tolist()
+        run['flippability_long_time'] = time_average(run['flippability'], t,
+                                                     t_max / 2).tolist()
         if run['entropy_midplane']:
             ent = np.array(run['entropy_midplane'])
             run['entropy_long_time'] = float(time_average(ent, t, t_max / 2))

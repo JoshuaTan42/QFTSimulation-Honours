@@ -163,8 +163,19 @@ class CasimirExplorer:
     # ------------------------------------------------------------------
 
     def set_params(self, **kwargs):
-        """Programmatic parameter change (used by the tests and for figures)."""
+        """Programmatic parameter change (tests, figures); the widgets follow."""
         self.params.update(kwargs)
+        sliders = {'W': self.s_W, 'd': self.s_d, 'J': self.s_J, 'g': self.s_g, 'rk': self.s_rk}
+        radios = {'pattern': self.r_pattern, 'plates': self.r_plates}
+        for key, widget in list(sliders.items()) + list(radios.items()):
+            if key not in kwargs:
+                continue
+            widget.eventson = False                 # one refresh below, not one per widget
+            if key in sliders:
+                widget.set_val(kwargs[key])
+            else:
+                widget.set_active([t.get_text() for t in widget.labels].index(kwargs[key]))
+            widget.eventson = True
         self.refresh()
 
     def _read_widgets(self):
@@ -268,7 +279,7 @@ class CasimirExplorer:
                 and len(self._dyn['idx']) == len(gs['support']):
             vec = np.zeros(sector.dim, dtype=complex)
             vec[self._dyn['idx']] = self._dyn['psi']
-            title = f"quench from the maximally flippable product state, t = {self.time:.2f}"
+            title = f"quench from the most-flippable product state, t = {self.time:.2f}"
         else:
             vec = gs['state']
             title = "ground state"
@@ -282,7 +293,8 @@ class CasimirExplorer:
         # flippability, which does evolve; otherwise the magnetic energy density.
         tiles = flip if quench else p['J'] * plaq
         self._draw_lattice(sector.lattice, efield, tiles, charges, title, light)
-        self._draw_profile(sector.lattice, plaq, flip, plates, light)
+        self._draw_profile(sector.lattice, plaq, flip, plates, light,
+                           gs_flip=sector.flippability(gs['state']) if quench else None)
         if not light:
             self._draw_casimir(plates)
         if self.view == "quench":
@@ -378,12 +390,20 @@ class CasimirExplorer:
         self.ax_lat.set_title(f"{lat.width} x {lat.height} cylinder, d = {lat.height - 1}: {title}",
                               fontsize=11)
 
-    def _draw_profile(self, lat, plaq, flip, plates, light=False):
+    def _draw_profile(self, lat, plaq, flip, plates, light=False, gs_flip=None):
+        """Row profile across the gap: energy density, or flippability during a quench.
+
+        In a quench with lam_RK = 0 the energy density of every plaquette stays
+        exactly zero (chiral and time-reversal symmetry of H_B), so the
+        flippability, which does evolve, is shown instead.
+        """
         p = self.params
         ax = self.ax_prof
         W, H = lat.width, lat.height
         rows = np.arange(H - 1) + 0.5
-        eps = (p['J'] * plaq + p['rk'] * flip).reshape(H - 1, W).mean(axis=1)
+        quench = gs_flip is not None
+        values = flip if quench else (p['J'] * plaq + p['rk'] * flip)
+        eps = values.reshape(H - 1, W).mean(axis=1)
         if light and getattr(self, "_prof_line", None) is not None \
                 and len(self._prof_line.get_xdata()) == len(rows):
             self._prof_line.set_ydata(eps)
@@ -393,20 +413,29 @@ class CasimirExplorer:
             return
         ax.clear()
         self._prof_line, = ax.plot(rows, eps, 'o-', color="#6c3483", lw=2,
-                                   label="energy per plaquette, row average")
-        if not light or getattr(self, "_bulk", None) is None:
-            ds, E0, _ = self.model.curve(p['W'], plates, p['g'], p['J'], p['rk'], p['pattern'])
-            self._bulk = ((E0[-1] - E0[-2]) / p['W'], ds[-1], ds[-2]) if len(ds) >= 2 else None
-        if self._bulk is not None:
-            bulk, d_hi, d_lo = self._bulk
-            ax.axhline(bulk, color="k", ls="--", lw=1,
-                       label=f"bulk: [E0({d_hi}) - E0({d_lo})]/W = {bulk:+.4f}")
+                                   label=("flippability per plaquette" if quench else
+                                          "energy per plaquette") + ", row average")
+        if quench:
+            ax.plot(rows, gs_flip.reshape(H - 1, W).mean(axis=1), 'k--', lw=1,
+                    label="ground state")
+            ax.set_ylim(-0.05, 1.05)
+        else:
+            if not light or getattr(self, "_bulk", None) is None:
+                ds, E0, _ = self.model.curve(p['W'], plates, p['g'], p['J'], p['rk'],
+                                             p['pattern'])
+                self._bulk = ((E0[-1] - E0[-2]) / p['W'], ds[-1], ds[-2]) \
+                    if len(ds) >= 2 else None
+            if self._bulk is not None:
+                bulk, d_hi, d_lo = self._bulk
+                ax.axhline(bulk, color="k", ls="--", lw=1,
+                           label=f"bulk: [E0({d_hi}) - E0({d_lo})]/W = {bulk:+.4f}")
         ax.axvspan(-0.15, 0.0, color="0.25", alpha=0.35)
         ax.axvspan(H - 1, H - 0.85, color="0.25", alpha=0.35)
         ax.set_xlim(-0.15, H - 0.85)
         ax.set_xlabel("y (plates shaded)")
-        ax.set_ylabel("energy density")
-        ax.set_title("(a) energy density across the gap", fontsize=10)
+        ax.set_ylabel("flippability" if quench else "energy density")
+        ax.set_title("(a) " + ("flippability" if quench else "energy density")
+                     + " across the gap", fontsize=10)
         ax.legend(fontsize=7.5, loc="best")
         ax.grid(alpha=0.3)
 

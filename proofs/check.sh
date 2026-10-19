@@ -5,7 +5,7 @@ set -e
 LEAN="${LEAN:-lean}"
 cd "$(dirname "$0")"
 "$LEAN" -o Lattice.olean Lattice.lean
-for f in GaugeInvariance Colouring Casimir PlaquettePauli; do
+for f in GaugeInvariance Colouring Casimir PlaquettePauli Matter; do
   LEAN_PATH=. "$LEAN" "$f.lean" && echo "ok  $f.lean"
 done
 echo "ok  Lattice.lean"
