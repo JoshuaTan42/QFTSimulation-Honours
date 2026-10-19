@@ -131,11 +131,14 @@ def rk_scan(width=4, rks=(-0.5, -0.25, 0.0, 0.25, 0.5, 0.7, 0.8, 0.9),
 
 def electric_scan(width=4, gs=(0.0, 0.5, 1.0, 2.0), separations=tuple(range(1, 8)), J=1.0,
                   rk=0.0, verbose=True) -> dict:
-    """Control experiment: a staggered electric field gaps the photon.
+    """Control experiment: the staggered electric field as a mass term.
 
     A mass term should shorten the range of the residual (smaller xi, faster
     decay of D2). This separates a genuine long-range effect from lattice
     artefacts in the lam_RK scan. Needs even W (fixed staggered plates).
+    With the staggered field the two lowest levels can become quasi-degenerate;
+    the reported gap is then the splitting of that doublet, not the excitation
+    gap, while E0 and D2 are unaffected.
     """
     rows = []
     for g in gs:

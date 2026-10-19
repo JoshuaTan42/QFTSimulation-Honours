@@ -345,14 +345,19 @@ class GaugeSector:
 
     @staticmethod
     def lowest(Hm, k: int = 2, seed: int = 0):
-        """Lowest k eigenpairs; dense for small blocks, Lanczos otherwise."""
+        """Lowest k eigenpairs; dense for small blocks, Lanczos otherwise.
+
+        The Krylov space is kept at 40 vectors: with the staggered field the
+        two lowest levels can be quasi-degenerate, and the default of 20
+        converges several times more slowly there.
+        """
         n = Hm.shape[0]
         k = max(1, min(k, n))
         if n <= DENSE_LIMIT:
             w, v = np.linalg.eigh(Hm.toarray() if sp.issparse(Hm) else Hm)
             return w[:k], v[:, :k]
         rng = np.random.default_rng(seed)
-        w, v = eigsh(Hm, k=k, which='SA', v0=rng.standard_normal(n))
+        w, v = eigsh(Hm, k=k, which='SA', v0=rng.standard_normal(n), ncv=min(n - 1, 40))
         order = np.argsort(w)
         return w[order], v[:, order]
 

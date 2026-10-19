@@ -1,0 +1,266 @@
+{
+ "environment": {
+  "python": "3.13.16",
+  "qiskit": "2.6.0",
+  "numpy": "2.5.3",
+  "scipy": "1.18.1"
+ },
+ "experiment": "quench",
+ "backend": "fake:kingston",
+ "lattice": "3x3",
+ "qubits": 15,
+ "J": 2.0,
+ "g": 0.0,
+ "rk": 0.0,
+ "plates": "free",
+ "dt": 0.25,
+ "order": 1,
+ "shots": 4000,
+ "initial_bits": 15022,
+ "block_dim": 21,
+ "resources": [
+  {
+   "circuit": "n=0 z",
+   "qubits_used": 15,
+   "two_qubit_gates": 0,
+   "two_qubit_depth": 0,
+   "depth": 2,
+   "estimated_fidelity": 0.9319208996530496
+  },
+  {
+   "circuit": "n=0 plaquette colour 0",
+   "qubits_used": 15,
+   "two_qubit_gates": 6,
+   "two_qubit_depth": 3,
+   "depth": 10,
+   "estimated_fidelity": 0.9047395392817166
+  },
+  {
+   "circuit": "n=0 plaquette colour 1",
+   "qubits_used": 15,
+   "two_qubit_gates": 6,
+   "two_qubit_depth": 3,
+   "depth": 9,
+   "estimated_fidelity": 0.9048665638229253
+  },
+  {
+   "circuit": "n=0 plaquette colour 2",
+   "qubits_used": 15,
+   "two_qubit_gates": 6,
+   "two_qubit_depth": 3,
+   "depth": 10,
+   "estimated_fidelity": 0.9052384803214227
+  },
+  {
+   "circuit": "n=1 z",
+   "qubits_used": 17,
+   "two_qubit_gates": 165,
+   "two_qubit_depth": 68,
+   "depth": 207,
+   "estimated_fidelity": 0.5901028907750893
+  },
+  {
+   "circuit": "n=1 plaquette colour 0",
+   "qubits_used": 16,
+   "two_qubit_gates": 182,
+   "two_qubit_depth": 67,
+   "depth": 204,
+   "estimated_fidelity": 0.5436107278081308
+  },
+  {
+   "circuit": "n=1 plaquette colour 1",
+   "qubits_used": 15,
+   "two_qubit_gates": 165,
+   "two_qubit_depth": 83,
+   "depth": 253,
+   "estimated_fidelity": 0.5692064189783586
+  },
+  {
+   "circuit": "n=1 plaquette colour 2",
+   "qubits_used": 17,
+   "two_qubit_gates": 151,
+   "two_qubit_depth": 64,
+   "depth": 207,
+   "estimated_fidelity": 0.5844569198202526
+  },
+  {
+   "circuit": "n=2 z",
+   "qubits_used": 16,
+   "two_qubit_gates": 332,
+   "two_qubit_depth": 138,
+   "depth": 425,
+   "estimated_fidelity": 0.3828258327572309
+  },
+  {
+   "circuit": "n=2 plaquette colour 0",
+   "qubits_used": 15,
+   "two_qubit_gates": 405,
+   "two_qubit_depth": 162,
+   "depth": 449,
+   "estimated_fidelity": 0.3533787059490389
+  },
+  {
+   "circuit": "n=2 plaquette colour 1",
+   "qubits_used": 15,
+   "two_qubit_gates": 329,
+   "two_qubit_depth": 147,
+   "depth": 435,
+   "estimated_fidelity": 0.40322286610211844
+  },
+  {
+   "circuit": "n=2 plaquette colour 2",
+   "qubits_used": 17,
+   "two_qubit_gates": 325,
+   "two_qubit_depth": 124,
+   "depth": 412,
+   "estimated_fidelity": 0.3972626668251462
+  },
+  {
+   "circuit": "n=3 z",
+   "qubits_used": 15,
+   "two_qubit_gates": 530,
+   "two_qubit_depth": 208,
+   "depth": 617,
+   "estimated_fidelity": 0.26664751914804335
+  },
+  {
+   "circuit": "n=3 plaquette colour 0",
+   "qubits_used": 16,
+   "two_qubit_gates": 572,
+   "two_qubit_depth": 235,
+   "depth": 687,
+   "estimated_fidelity": 0.24180196668539775
+  },
+  {
+   "circuit": "n=3 plaquette colour 1",
+   "qubits_used": 17,
+   "two_qubit_gates": 661,
+   "two_qubit_depth": 302,
+   "depth": 846,
+   "estimated_fidelity": 0.18694196741255456
+  },
+  {
+   "circuit": "n=3 plaquette colour 2",
+   "qubits_used": 16,
+   "two_qubit_gates": 502,
+   "two_qubit_depth": 250,
+   "depth": 718,
+   "estimated_fidelity": 0.28093774670825306
+  },
+  {
+   "circuit": "n=4 z",
+   "qubits_used": 15,
+   "two_qubit_gates": 720,
+   "two_qubit_depth": 325,
+   "depth": 957,
+   "estimated_fidelity": 0.18407747058875992
+  },
+  {
+   "circuit": "n=4 plaquette colour 0",
+   "qubits_used": 15,
+   "two_qubit_gates": 786,
+   "two_qubit_depth": 298,
+   "depth": 849,
+   "estimated_fidelity": 0.16416297222769122
+  },
+  {
+   "circuit": "n=4 plaquette colour 1",
+   "qubits_used": 15,
+   "two_qubit_gates": 726,
+   "two_qubit_depth": 308,
+   "depth": 891,
+   "estimated_fidelity": 0.18230709130936726
+  },
+  {
+   "circuit": "n=4 plaquette colour 2",
+   "qubits_used": 15,
+   "two_qubit_gates": 695,
+   "two_qubit_depth": 297,
+   "depth": 868,
+   "estimated_fidelity": 0.19797792967656228
+  },
+  {
+   "circuit": "n=5 z",
+   "qubits_used": 15,
+   "two_qubit_gates": 928,
+   "two_qubit_depth": 395,
+   "depth": 1083,
+   "estimated_fidelity": 0.1264478584720222
+  },
+  {
+   "circuit": "n=5 plaquette colour 0",
+   "qubits_used": 15,
+   "two_qubit_gates": 950,
+   "two_qubit_depth": 385,
+   "depth": 1078,
+   "estimated_fidelity": 0.1263116857154511
+  },
+  {
+   "circuit": "n=5 plaquette colour 1",
+   "qubits_used": 15,
+   "two_qubit_gates": 962,
+   "two_qubit_depth": 403,
+   "depth": 1141,
+   "estimated_fidelity": 0.1206711824932215
+  },
+  {
+   "circuit": "n=5 plaquette colour 2",
+   "qubits_used": 15,
+   "two_qubit_gates": 926,
+   "two_qubit_depth": 402,
+   "depth": 1156,
+   "estimated_fidelity": 0.12552008602161444
+  }
+ ],
+ "reference": [
+  {
+   "steps": 0,
+   "time": 0.0,
+   "return_probability": 1.0,
+   "mean_flippability": 0.6666666666666666,
+   "magnetic_energy": 0.0,
+   "energy": 0.0
+  },
+  {
+   "steps": 1,
+   "time": 0.25,
+   "return_probability": 0.351806516497099,
+   "mean_flippability": 0.5175672124207026,
+   "magnetic_energy": 0.0,
+   "energy": 0.0
+  },
+  {
+   "steps": 2,
+   "time": 0.5,
+   "return_probability": 0.0007347452820087919,
+   "mean_flippability": 0.3691825798504289,
+   "magnetic_energy": 0.0,
+   "energy": 0.0
+  },
+  {
+   "steps": 3,
+   "time": 0.75,
+   "return_probability": 0.0007604480682112863,
+   "mean_flippability": 0.40577852363681255,
+   "magnetic_energy": 0.0,
+   "energy": 0.0
+  },
+  {
+   "steps": 4,
+   "time": 1.0,
+   "return_probability": 0.139461834272642,
+   "mean_flippability": 0.45648315350938135,
+   "magnetic_energy": 0.0,
+   "energy": 0.0
+  },
+  {
+   "steps": 5,
+   "time": 1.25,
+   "return_probability": 0.15821181544120008,
+   "mean_flippability": 0.47528636674272123,
+   "magnetic_energy": 0.0,
+   "energy": 0.0
+  }
+ ],
+ "transpile_seconds": 7.5844197273254395
+}

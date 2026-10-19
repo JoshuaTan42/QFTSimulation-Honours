@@ -1,0 +1,51 @@
+{
+ "environment": {
+  "python": "3.13.16",
+  "qiskit": "2.6.0",
+  "numpy": "2.5.3",
+  "scipy": "1.18.1"
+ },
+ "experiment": "filter",
+ "backend": "fake:kingston",
+ "lattice": "2x2",
+ "qubits": 7,
+ "J": 2.0,
+ "degree": 2,
+ "signal_operators": 4,
+ "n_steps": 1,
+ "order": 1,
+ "shots": 4000,
+ "E0": -2.8284271247461903,
+ "emulated": {
+  "success_prob": 0.3874761401658349,
+  "energy": -2.559017555874527,
+  "overlap": 0.912996180293087
+ },
+ "initial_overlap": 0.4999999999999999,
+ "resources": [
+  {
+   "circuit": "z",
+   "qubits_used": 7,
+   "two_qubit_gates": 252,
+   "two_qubit_depth": 196,
+   "depth": 587,
+   "estimated_fidelity": 0.5757766713507649
+  },
+  {
+   "circuit": "plaquette colour 0",
+   "qubits_used": 7,
+   "two_qubit_gates": 258,
+   "two_qubit_depth": 193,
+   "depth": 555,
+   "estimated_fidelity": 0.5771035361069522
+  },
+  {
+   "circuit": "plaquette colour 1",
+   "qubits_used": 7,
+   "two_qubit_gates": 246,
+   "two_qubit_depth": 191,
+   "depth": 576,
+   "estimated_fidelity": 0.580795252954884
+  }
+ ]
+}

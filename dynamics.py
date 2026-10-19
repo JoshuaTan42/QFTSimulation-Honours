@@ -209,8 +209,9 @@ def quench(W=4, d=3, J=1.0, g=0.0, rk=0.0, field_pattern="uniform", plates=None,
     """Exact quench on the W x (d+1) cylinder with optional Trotter comparison.
 
     trotter: (dt, order) pairs. For each, the structured Trotter circuit is
-    emulated in the sector and its fidelity with the exact state is recorded
-    at the multiples of dt that fall on the output time grid.
+    emulated in the sector, and its fidelity with the exact state and its
+    return probability are recorded after every step up to t_max, together
+    with the measured two-qubit cost of one step.
     """
     lattice = LatticeGrid(W, d + 1)
     plates = plates or default_plates(W)

@@ -12,7 +12,7 @@ Vertical links        | 6
 Link qubits N_q       | 15
 Plaquettes            | 6
 Plaquette sublayers   | 3
-Boundary              | cylinder
+Boundary              | cylinder (periodic x, open y)
 
        plate (j = H-1)        
 o--q6  ---o--q7  ---o--q8  ---o
@@ -40,13 +40,13 @@ plaquette sublayers: checkerboard valid = False, 3-colouring valid = True
      E0 sector -5.8670439833 | full space -5.8670439833 | eigsh spread 3.5e-13 | gap 1.394908 | max ||G_j psi|| = 0.0e+00
 
 Penalty scan on 3x3 (sector E0 = -5.86704398):
-  lambda=    2  E0=-5.86704398  diff=1.9e-14  max||G psi||=3.3e-16  Pauli 1-norm=     36.0
-  lambda=   10  E0=-5.86704398  diff=2.1e-14  max||G psi||=3.5e-16  Pauli 1-norm=    132.0
-  lambda=   50  E0=-5.86704398  diff=1.6e-14  max||G psi||=7.4e-16  Pauli 1-norm=    612.0
-  lambda=  100  E0=-5.86704398  diff=1.5e-13  max||G psi||=5.3e-16  Pauli 1-norm=   1212.0
-  lambda=  150  E0=-5.86704398  diff=1.2e-13  max||G psi||=7.2e-16  Pauli 1-norm=   1812.0
-  lambda=  500  E0=-5.86704398  diff=5.8e-14  max||G psi||=5.1e-16  Pauli 1-norm=   6012.0
-  lambda= 1000  E0=-5.86704398  diff=1.7e-13  max||G psi||=3.6e-16  Pauli 1-norm=  12012.0
+  lambda=    2  E0=-5.86704398  diff=1.6e-14  max||G psi||=4.5e-16  Pauli 1-norm=     36.0
+  lambda=   10  E0=-5.86704398  diff=7.1e-15  max||G psi||=3.9e-16  Pauli 1-norm=    132.0
+  lambda=   50  E0=-5.86704398  diff=4.0e-14  max||G psi||=4.3e-16  Pauli 1-norm=    612.0
+  lambda=  100  E0=-5.86704398  diff=4.0e-14  max||G psi||=1.1e-15  Pauli 1-norm=   1212.0
+  lambda=  150  E0=-5.86704398  diff=1.2e-13  max||G psi||=5.1e-16  Pauli 1-norm=   1812.0
+  lambda=  500  E0=-5.86704398  diff=2.6e-13  max||G psi||=6.8e-16  Pauli 1-norm=   6012.0
+  lambda= 1000  E0=-5.86704398  diff=1.6e-13  max||G psi||=4.0e-16  Pauli 1-norm=  12012.0
 
 ========================================================================
 3  Structured Trotter decomposition
@@ -55,17 +55,17 @@ order 1: one-step error ['3.98e-02', '9.99e-03', '2.50e-03'] -> dt^2.00  (global
 order 2: one-step error ['2.74e-03', '3.45e-04', '4.32e-05'] -> dt^2.99  (global error dt^1.99)
 
  lattice  N_q layers | 2q gates 2q depth  depth | ladders 2q/depth | generic 2q/depth
-    2x2     6      2 |       26       24     54 |     34 /   32   |     84 /    84
-    2x3    10      2 |       52       25     54 |     68 /   33   |    168 /   123
-    3x3    15      3 |       78       36     78 |    102 /   48   |    252 /   165
-    4x3    20      2 |      104       25     54 |    136 /   33   |    336 /   207
-    3x5    27      3 |      156       37     79 |    204 /   49   |      -
-    4x4    28      2 |      156       25     54 |    204 /   33   |      -
-    6x4    42      2 |      234       25     54 |    306 /   33   |      -
-    8x6    88      2 |      520       25     54 |    680 /   33   |      -
+    2x2     6      2 |       26       24    104 |     34 /   32   |     34 /    24
+    2x3    10      2 |       52       25    104 |     68 /   33   |     86 /    43
+    3x3    15      3 |       78       36    153 |    102 /   48   |    147 /    82
+    4x3    20      2 |      104       25    104 |    136 /   33   |    217 /   130
+    3x5    27      3 |      156       37    154 |    204 /   49   |      -
+    4x4    28      2 |      156       25    104 |    204 /   33   |      -
+    6x4    42      2 |      234       25    104 |    306 /   33   |      -
+    8x6    88      2 |      520       25    104 |    680 /   33   |      -
 
 ========================================================================
-4  RQSVT ground-state preparation (one ancilla)
+4  Single-ancilla ground-state filter (RQSVT)
 ========================================================================
 
 [step filter]  16 qubits, lambda_H=12.0, gap=1.3949, Fourier degree D=68, 136 signal operators, initial overlap=0.1642
@@ -78,8 +78,8 @@ order 2: one-step error ['2.74e-03', '3.45e-04', '4.32e-05'] -> dt^2.99  (global
   qdrift  N=400 : E=-5.57401476  err=+2.9e-01  overlap=0.917392
   qdrift  N=800 : E=-5.70464941  err=+1.6e-01  overlap=0.943009
   Richardson      : E=-5.81467709  err=+5.2e-02
-  two-qubit gates : GQSP+Trotter(n=1) 13,056 (Pauli ladders: 32,640) on 16 qubits | GQSP+qDRIFT(N=800) 1,405,492 on 16 qubits
-                    block-encoded QSVT ~453,424 on 22 qubits (unary iteration ~183,056 on 28)
+  two-qubit gates : GQSP+Trotter(n=1) 13,056 (Pauli ladders: 30,192) on 16 qubits | GQSP+qDRIFT(N=800) 1,405,424 on 16 qubits
+                    block-encoded QSVT ~428,128 on 22 qubits (unary iteration ~183,056 on 28)
 
 [gaussian filter]  16 qubits, lambda_H=12.0, gap=1.3949, Fourier degree D=34, 68 signal operators, initial overlap=0.1642
   exact signal op : E=-5.86703619  err=+7.8e-06  overlap=0.999995  P(success)=0.158
@@ -91,8 +91,8 @@ order 2: one-step error ['2.74e-03', '3.45e-04', '4.32e-05'] -> dt^2.99  (global
   qdrift  N=400 : E=-5.71399314  err=+1.5e-01  overlap=0.959453
   qdrift  N=800 : E=-5.79103149  err=+7.6e-02  overlap=0.973165
   Richardson      : E=-5.85190810  err=+1.5e-02
-  two-qubit gates : GQSP+Trotter(n=1) 6,528 (Pauli ladders: 16,320) on 16 qubits | GQSP+qDRIFT(N=800) 702,746 on 16 qubits
-                    block-encoded QSVT ~226,712 on 22 qubits (unary iteration ~91,528 on 28)
+  two-qubit gates : GQSP+Trotter(n=1) 6,528 (Pauli ladders: 15,096) on 16 qubits | GQSP+qDRIFT(N=800) 702,746 on 16 qubits
+                    block-encoded QSVT ~214,064 on 22 qubits (unary iteration ~91,528 on 28)
 
 ========================================================================
 5  Casimir energy against plate separation
@@ -100,9 +100,9 @@ order 2: one-step error ['2.74e-03', '3.45e-04', '4.32e-05'] -> dt^2.99  (global
 ========================================================================
 CASIMIR SCAN  W=2  g=0.0 J=1.0 lam_RK=0.0  plates=fixed
 ========================================================================
- d=1  N_q= 6  sector dim=      5  E0=-1.41421356  gap=1.4142   full-space diff 2.7e-14
- d=2  N_q=10  sector dim=     13  E0=-2.44948974  gap=1.0353   full-space diff 3.3e-13
- d=3  N_q=14  sector dim=     41  E0=-3.57491979  gap=0.8429   full-space diff 6.2e-15
+ d=1  N_q= 6  sector dim=      5  E0=-1.41421356  gap=1.4142   full-space diff 4.1e-14
+ d=2  N_q=10  sector dim=     13  E0=-2.44948974  gap=1.0353   full-space diff 1.4e-13
+ d=3  N_q=14  sector dim=     41  E0=-3.57491979  gap=0.8429   full-space diff 3.3e-13
  d=4  N_q=18  sector dim=    121  E0=-4.68105448  gap=0.7090
  d=5  N_q=22  sector dim=    365  E0=-5.79407438  gap=0.6136
  d=6  N_q=26  sector dim=   1093  E0=-6.90675140  gap=0.5410
@@ -120,7 +120,7 @@ Fits on d >= 2:
 CASIMIR SCAN  W=3  g=0.0 J=1.0 lam_RK=0.0  plates=free
 ========================================================================
  d=1  N_q= 9  sector dim=    512  E0=-1.61803399  gap=1.0000   full-space diff 1.1e-15
- d=2  N_q=15  sector dim=   1792  E0=-2.93352199  gap=0.6975   full-space diff 6.5e-13
+ d=2  N_q=15  sector dim=   1792  E0=-2.93352199  gap=0.6975   full-space diff 8.9e-14
  d=3  N_q=21  sector dim=   6656  E0=-4.35598881  gap=0.6314
  d=4  N_q=27  sector dim=  25600  E0=-5.73073279  gap=0.4715
  d=5  N_q=33  sector dim= 100352  E0=-7.14452698  gap=0.4716
@@ -134,7 +134,7 @@ Fits on d >= 2:
 ========================================================================
 CASIMIR SCAN  W=4  g=0.0 J=1.0 lam_RK=0.0  plates=fixed
 ========================================================================
- d=1  N_q=12  sector dim=      9  E0=-2.44948974  gap=1.0353   full-space diff 2.9e-14
+ d=1  N_q=12  sector dim=      9  E0=-2.44948974  gap=1.0353   full-space diff 3.9e-14
  d=2  N_q=20  sector dim=     53  E0=-4.43939229  gap=0.6546
  d=3  N_q=28  sector dim=    341  E0=-6.49837353  gap=0.4748
  d=4  N_q=36  sector dim=   2169  E0=-8.55488075  gap=0.3594
@@ -154,12 +154,17 @@ CASIMIR SCAN  W=6  g=0.0 J=1.0 lam_RK=0.0  plates=fixed
  d=2  N_q=30  sector dim=    253  E0=-6.59368690  gap=0.5834
  d=3  N_q=42  sector dim=   3725  E0=-9.65833762  gap=0.3899
  d=4  N_q=54  sector dim=  53812  E0=-12.72353240  gap=0.2664
+ d=5  N_q=66  sector dim= 781043  E0=-15.80075497  gap=0.1837
 
-Need at least five separations for the three-parameter fits.
+Fits on d >= 2:
+  power law    E0 = -0.1340 -3.0847 d -0.3340 d^-0.20   -> alpha = 1.20   SSE = 1.18e-05
+  exponential  E0 = +0.7089 -3.1435 d -1.2003 exp(-d/12.00)   SSE = 7.21e-06
+  second difference D2(d): d=2: -0.10124  d=3: -0.00054  d=4: -0.01203
+  alpha from slope of |F|: 1.33 (2 points);  from |D2|: 2.72;  continuum value 3
 ========================================================================
 CASIMIR SCAN  W=4  g=0.0 J=1.0 lam_RK=0.5  plates=fixed
 ========================================================================
- d=1  N_q=12  sector dim=      9  E0=-1.17740968  gap=0.7632   full-space diff 3.7e-13
+ d=1  N_q=12  sector dim=      9  E0=-1.17740968  gap=0.7632   full-space diff 7.6e-14
  d=2  N_q=20  sector dim=     53  E0=-2.13057585  gap=0.4226
  d=3  N_q=28  sector dim=    341  E0=-3.10075817  gap=0.3007
  d=4  N_q=36  sector dim=   2169  E0=-4.07354607  gap=0.2280
@@ -176,9 +181,10 @@ Fits on d >= 2:
 ========================================================================
 6  DMRG cross-check
 ========================================================================
-  2x3 (10 qubits, fixed plates): ED -4.8989794856  DMRG -4.8989794789  rel. diff 1.4e-09  MPO bond 11  MPS bond 7
-  3x3 (15 qubits, free plates): ED -5.8670439833  DMRG -5.8670439832  rel. diff 1.5e-11  MPO bond 17  MPS bond 14
+  2x3 (10 qubits, fixed plates): ED -4.8989794856  DMRG -4.8989792341  rel. diff 5.1e-08  MPO bond 11  MPS bond 9
+  3x3 (15 qubits, free plates): ED -5.8670439833  DMRG -5.8670439832  rel. diff 1.3e-11  MPO bond 17  MPS bond 14
   2x3: exact max bond 6;  chi=2: 5.4e-01  chi=4: 1.7e-01  chi=8: 1.8e-15  chi=16: 1.8e-15  chi=32: 1.8e-15
   3x3: exact max bond 11;  chi=2: 6.4e-01  chi=4: 3.8e-01  chi=8: 8.8e-02  chi=16: 0.0e+00  chi=32: 0.0e+00
 
-Done in 85 s. Numbers: results/summary.json
+Done in 238 s. Numbers: results/summary.json
+saved results/rqsvt_resources.png, results/trotter_resources.png

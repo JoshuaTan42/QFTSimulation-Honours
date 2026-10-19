@@ -10,29 +10,136 @@ rk-scan
  lam_RK=+0.80  xi= 0.44  alpha=5.97  SSE exp/pow=5.6e-08/4.9e-08 (power)  all D2<0: False  gap(d=7)=0.140
  lam_RK=+0.90  xi= 0.10* alpha=9.00* SSE exp/pow=3.2e-08/3.9e-08 (exp)  all D2<0: False  gap(d=7)=0.070
  (* = fit parameter at the edge of its search range: not determined)
- [81 s]  -> results/rk_scan*.json/.png
+ [216 s]  -> results/
+========================================================================
+electric
+========================================================================
+ g=0.00  xi=12.00* alpha=1.20* gap(d=7)=0.179  D2: -0.0691 +0.0025 -0.0053 -0.0029 -0.0024
+ g=0.50  xi= 0.77  alpha=3.55  gap(d=7)=0.000  D2: -0.3941 -0.0509 -0.0151 -0.0032 -0.0008
+ g=1.00  xi= 0.62  alpha=4.50  gap(d=7)=0.000  D2: -0.3448 -0.0107 -0.0025 -0.0002 -0.0000
+ g=2.00  xi= 0.59  alpha=4.69  gap(d=7)=0.000  D2: -0.2230 -0.0008 -0.0002 -0.0000 -0.0000
+ [273 s]  -> results/
+========================================================================
+width
+========================================================================
+ W=2 d=1:         5 states  E0/W=-0.70710678  gap=1.4142  [0.0 s]
+ W=2 d=2:        13 states  E0/W=-1.22474487  gap=1.0353  [0.0 s]
+ W=2 d=3:        41 states  E0/W=-1.78745990  gap=0.8429  [0.0 s]
+ W=2 d=4:       121 states  E0/W=-2.34052724  gap=0.7090  [0.1 s]
+ W=2 d=5:       365 states  E0/W=-2.89703719  gap=0.6136  [2.1 s]
+ W=2 d=6:     1,093 states  E0/W=-3.45337570  gap=0.5410  [0.1 s]
+ W=2 d=7:     3,281 states  E0/W=-4.01021980  gap=0.4840  [0.1 s]
+ W=4 d=1:         9 states  E0/W=-0.61237244  gap=1.0353  [0.0 s]
+ W=4 d=2:        53 states  E0/W=-1.10984807  gap=0.6546  [0.1 s]
+ W=4 d=3:       341 states  E0/W=-1.62459338  gap=0.4748  [0.9 s]
+ W=4 d=4:     2,169 states  E0/W=-2.13872019  gap=0.3594  [0.0 s]
+ W=4 d=5:    13,825 states  E0/W=-2.65417600  gap=0.2801  [0.3 s]
+ W=4 d=6:    88,093 states  E0/W=-3.17036315  gap=0.2225  [4.0 s]
+ W=4 d=7:   561,357 states  E0/W=-3.68715120  gap=0.1791  [20.0 s]
+ W=6 d=1:        20 states  E0/W=-0.60504610  gap=0.9845  [0.0 s]
+ W=6 d=2:       253 states  E0/W=-1.09894782  gap=0.5834  [0.7 s]
+ W=6 d=3:     3,725 states  E0/W=-1.60972294  gap=0.3899  [0.2 s]
+ W=6 d=4:    53,812 states  E0/W=-2.12058873  gap=0.2664  [4.6 s]
+ W=6 d=5:   781,043 states  E0/W=-2.63345916  gap=0.1837  [51.1 s]
+ W=6 d=6: 11,328,703 states > max_dim, stopping this width
+ W=8 d=1:        49 states  E0/W=-0.60386983  gap=0.9727  [0.1 s]
+ W=8 d=2:     1,317 states  E0/W=-1.09641471  gap=0.5586  [0.2 s]
+ W=8 d=3:    44,269 states  E0/W=-1.60575157  gap=0.3540  [9.6 s]
+ W=8 d=4: 1,474,937 states  E0/W=-2.11549192  gap=0.2227  [331.6 s]
+ W=8 d=5: 49,622,793 states > max_dim, stopping this width
+ d=1: E0/W -> -0.60046223 (from W=[2, 4, 6, 8], slope in 1/W^2 -0.1879)
+ d=2: E0/W -> -1.09140730 (from W=[2, 4, 6, 8], slope in 1/W^2 -0.2926)   D2/W -> -0.016609
+ d=3: E0/W -> -1.59896146 (from W=[2, 4, 6, 8], slope in 1/W^2 -0.4078)   D2/W -> -0.000717
+ d=4: E0/W -> -2.10723308 (from W=[2, 4, 6, 8], slope in 1/W^2 -0.5014)   D2/W -> -0.001343
+ d=5: E0/W -> -2.58955308 (from W=[2, 4, 6], slope in 1/W^2 -1.2226)   D2/W -> -0.001032
+ d=6: E0/W -> -3.07602563 (from W=[2, 4], slope in 1/W^2 -1.5094)   D2/W -> -0.000633
+ d=7: E0/W -> -3.57946166 (from W=[2, 4], slope in 1/W^2 -1.7230)
+ [428 s]  -> results/
 ========================================================================
 filter-scaling
 ========================================================================
- d=1  13 qubits  gap=1.035  signal ops=  32  overlap0=0.3333  P(success)=0.3035  err(n=1)=+1.4e-02  Richardson=+5.5e-04  2q gates=1,856  [0s]
- d=2  21 qubits  gap=0.655  signal ops=  98  overlap0=0.1469  P(success)=0.1341  err(n=1)=+8.2e-03  Richardson=+2.4e-04  2q gates=12,544  [0s]
- d=3  29 qubits  gap=0.475  signal ops= 200  overlap0=0.0601  P(success)=0.0552  err(n=1)=+6.6e-03  Richardson=+1.2e-04  2q gates=38,400  [1s]
- d=4  37 qubits  gap=0.359  signal ops= 352  overlap0=0.0241  P(success)=0.0223  err(n=1)=+5.3e-03  Richardson=+7.4e-05  2q gates=90,112  [7s]
- two-qubit gates grow as d^2.84 (expected about d^2 from lambda_H / gap)
- [10 s]  -> results/filter_scaling*.json/.png
+ d=1  13 qubits  gap=1.035  signal ops=  32  overlap0=0.3333  P(success)=0.3035  err(n=1)=+1.4e-02  Richardson=+5.5e-04  2q gates=1,856  [2s]
+ d=2  21 qubits  gap=0.655  signal ops=  98  overlap0=0.1469  P(success)=0.1341  err(n=1)=+8.2e-03  Richardson=+2.4e-04  2q gates=12,544  [3s]
+ d=3  29 qubits  gap=0.475  signal ops= 200  overlap0=0.0601  P(success)=0.0552  err(n=1)=+6.6e-03  Richardson=+1.2e-04  2q gates=38,400  [11s]
+ d=4  37 qubits  gap=0.359  signal ops= 352  overlap0=0.0241  P(success)=0.0223  err(n=1)=+5.3e-03  Richardson=+7.4e-05  2q gates=90,112  [24s]
+ two-qubit gates grow as d^2.84 (about d^3 expected: lambda_H/gap ~ d^2 signal operators with ~ d plaquettes each); initial overlap falls by 2.40x per unit of d
+ [41 s]  -> results/
 ========================================================================
 noise
 ========================================================================
  2x2: 7 qubits, 384 CX, E0=-2.8284, 400 trajectories per point
-   p=0e+00  errors/circuit= 0.00  dE raw=+0.0142  dE gauge-selected=+0.0142  physical weight=1.000
-   p=1e-04  errors/circuit= 0.04  dE raw=+0.0744  dE gauge-selected=+0.0563  physical weight=0.992
-   p=3e-04  errors/circuit= 0.12  dE raw=+0.2214  dE gauge-selected=+0.0894  physical weight=0.945
-   p=1e-03  errors/circuit= 0.38  dE raw=+0.6063  dE gauge-selected=+0.3415  physical weight=0.882
-   p=3e-03  errors/circuit= 1.15  dE raw=+1.5798  dE gauge-selected=+1.0234  physical weight=0.658
- 2x3: 11 qubits, 2048 CX, E0=-4.8990, 80 trajectories per point
-   p=0e+00  errors/circuit= 0.00  dE raw=+0.0274  dE gauge-selected=+0.0274  physical weight=1.000
-   p=1e-04  errors/circuit= 0.20  dE raw=+0.3927  dE gauge-selected=+0.0807  physical weight=0.925
-   p=3e-04  errors/circuit= 0.61  dE raw=+1.1728  dE gauge-selected=+0.3004  physical weight=0.748
-   p=1e-03  errors/circuit= 2.05  dE raw=+3.6783  dE gauge-selected=+1.8069  physical weight=0.347
-   p=3e-03  errors/circuit= 6.14  dE raw=+4.8395  dE gauge-selected=+3.0933  physical weight=0.016
- [22 s]  -> results/noise*.json/.png
+   p=0e+00  errors/circuit= 0.00  dE raw=+0.0142 +- 0.0000  dE gauge-selected=+0.0142 +- 0.0000  accepted: ancilla 0.461, + Gauss 0.461
+   p=3e-05  errors/circuit= 0.01  dE raw=+0.0459 +- 0.0170  dE gauge-selected=+0.0411 +- 0.0162  accepted: ancilla 0.460, + Gauss 0.458
+   p=1e-04  errors/circuit= 0.04  dE raw=+0.0687 +- 0.0215  dE gauge-selected=+0.0396 +- 0.0159  accepted: ancilla 0.453, + Gauss 0.448
+   p=3e-04  errors/circuit= 0.12  dE raw=+0.1990 +- 0.0384  dE gauge-selected=+0.1300 +- 0.0322  accepted: ancilla 0.449, + Gauss 0.437
+   p=1e-03  errors/circuit= 0.38  dE raw=+0.7118 +- 0.0726  dE gauge-selected=+0.4500 +- 0.0693  accepted: ancilla 0.417, + Gauss 0.369
+   p=3e-03  errors/circuit= 1.15  dE raw=+1.5875 +- 0.0926  dE gauge-selected=+0.9726 +- 0.1155  accepted: ancilla 0.354, + Gauss 0.229
+ 2x3: 11 qubits, 2048 CX, E0=-4.8990, 400 trajectories per point
+   p=0e+00  errors/circuit= 0.00  dE raw=+0.0274 +- 0.0000  dE gauge-selected=+0.0274 +- 0.0000  accepted: ancilla 0.304, + Gauss 0.304
+   p=3e-05  errors/circuit= 0.06  dE raw=+0.1922 +- 0.0569  dE gauge-selected=+0.1447 +- 0.0527  accepted: ancilla 0.299, + Gauss 0.295
+   p=1e-04  errors/circuit= 0.20  dE raw=+0.6276 +- 0.1095  dE gauge-selected=+0.3950 +- 0.0966  accepted: ancilla 0.290, + Gauss 0.270
+   p=3e-04  errors/circuit= 0.61  dE raw=+1.3140 +- 0.1461  dE gauge-selected=+0.6327 +- 0.1290  accepted: ancilla 0.259, + Gauss 0.209
+   p=1e-03  errors/circuit= 2.05  dE raw=+3.6043 +- 0.1371  dE gauge-selected=+2.2188 +- 0.2594  accepted: ancilla 0.223, + Gauss 0.088
+   p=3e-03  errors/circuit= 6.14  dE raw=+4.8142 +- 0.0264  dE gauge-selected=+3.7345 +- 0.5322  accepted: ancilla 0.312, + Gauss 0.012
+ [217 s]  -> results/
+========================================================================
+quench
+========================================================================
+ d=1  12 qubits  block dim      9  echo 1/e time 0.50  late echo 0.330  S_max 1.927  Trotter(dt=0.25, order 2) F(t_max)=0.9891, 74 CX/step
+ d=2  20 qubits  block dim     53  echo 1/e time 0.40  late echo 0.241  S_max 1.945  Trotter(dt=0.25, order 2) F(t_max)=0.9766, 156 CX/step
+ d=3  28 qubits  block dim    341  echo 1/e time 0.30  late echo 0.058  S_max 3.490  Trotter(dt=0.25, order 2) F(t_max)=0.9729, 234 CX/step
+ d=4  36 qubits  block dim   2169  echo 1/e time 0.30  late echo 0.039  S_max 3.608  Trotter(dt=0.25, order 2) F(t_max)=0.9653, 312 CX/step
+ d=5  44 qubits  block dim  13825  echo 1/e time 0.30  late echo 0.006  S_max 4.969  Trotter(dt=0.25, order 2) F(t_max)=0.9595, 390 CX/step
+ [229 s]  -> results/
+========================================================================
+trotter-order
+========================================================================
+ 2x3 order 1: n=1: +2.7e-02 (2,048 2q)  n=2: +5.9e-03 (4,096 2q)  n=4: +1.4e-03 (8,192 2q)  n=8: +3.6e-04 (16,384 2q)  | Richardson -9.4e-05 (30,720 2q total)
+ 2x3 order 2: n=1: +6.4e-04 (2,784 2q)  n=2: +3.8e-05 (5,568 2q)  n=4: +2.3e-06 (11,136 2q)  | Richardson +7.5e-07 (19,488 2q total)
+ 3x3 order 1: n=1: +3.4e-02 (6,528 2q)  n=2: +8.6e-03 (13,056 2q)  n=4: +2.2e-03 (26,112 2q)  n=8: +5.6e-04 (52,224 2q)  | Richardson +8.9e-06 (97,920 2q total)
+ 3x3 order 2: n=1: +1.5e-04 (9,656 2q)  n=2: +1.5e-05 (19,312 2q)  n=4: +7.9e-06 (38,624 2q)  | Richardson +7.8e-06 (67,592 2q total)
+ [3 s]  -> results/
+========================================================================
+trotter-budget
+========================================================================
+ order 1  dt=0.400: fidelity >= 0.99 up to t=0.00 (0 steps, 0 two-qubit gates at 78 per step)
+ order 1  dt=0.200: fidelity >= 0.99 up to t=0.20 (1 steps, 78 two-qubit gates at 78 per step)
+ order 1  dt=0.100: fidelity >= 0.99 up to t=0.40 (4 steps, 312 two-qubit gates at 78 per step)
+ order 1  dt=0.050: fidelity >= 0.99 up to t=1.50 (30 steps, 2,340 two-qubit gates at 78 per step)
+ order 2  dt=0.400: fidelity >= 0.99 up to t=0.00 (0 steps, 0 two-qubit gates at 126 per step)
+ order 2  dt=0.200: fidelity >= 0.99 up to t=4.00 (20 steps, 2,520 two-qubit gates at 126 per step)
+ order 2  dt=0.100: fidelity >= 0.99 up to t=5.00 (50 steps, 6,300 two-qubit gates at 126 per step)
+ order 2  dt=0.050: fidelity >= 0.99 up to t=5.00 (100 steps, 12,600 two-qubit gates at 126 per step)
+ [3 s]  -> results/
+========================================================================
+filter-design
+========================================================================
+ gaussian sharpness=2.0 truncation=1e-02: D= 19 (38 signal ops)  overlap=0.996486  P=0.158  err exact=+5.6e-03  err Trotter n=1=+7.3e-02
+ gaussian sharpness=2.0 truncation=1e-03: D= 23 (46 signal ops)  overlap=0.996493  P=0.158  err exact=+5.6e-03  err Trotter n=1=+5.0e-02
+ gaussian sharpness=2.0 truncation=1e-04: D= 27 (54 signal ops)  overlap=0.996503  P=0.158  err exact=+5.6e-03  err Trotter n=1=+2.9e-02
+ gaussian sharpness=3.0 truncation=1e-02: D= 28 (56 signal ops)  overlap=0.999996  P=0.158  err exact=+8.6e-06  err Trotter n=1=+3.3e-02
+ gaussian sharpness=3.0 truncation=1e-03: D= 34 (68 signal ops)  overlap=0.999995  P=0.158  err exact=+7.8e-06  err Trotter n=1=+3.4e-02
+ gaussian sharpness=3.0 truncation=1e-04: D= 40 (80 signal ops)  overlap=0.999995  P=0.158  err exact=+8.1e-06  err Trotter n=1=+4.7e-02
+ gaussian sharpness=4.0 truncation=1e-02: D= 37 (74 signal ops)  overlap=0.999999  P=0.158  err exact=+3.9e-06  err Trotter n=1=+4.1e-02
+ gaussian sharpness=4.0 truncation=1e-03: D= 46 (92 signal ops)  overlap=1.000000  P=0.158  err exact=+2.2e-08  err Trotter n=1=+4.8e-02
+ gaussian sharpness=4.0 truncation=1e-04: D= 53 (106 signal ops)  overlap=1.000000  P=0.158  err exact=+1.3e-09  err Trotter n=1=+4.5e-02
+ step     sharpness=2.0 truncation=1e-02: D= 37 (74 signal ops)  overlap=0.999982  P=0.151  err exact=+2.9e-05  err Trotter n=1=+6.9e-02
+ step     sharpness=2.0 truncation=1e-03: D= 46 (92 signal ops)  overlap=0.999983  P=0.151  err exact=+2.7e-05  err Trotter n=1=+7.8e-02
+ step     sharpness=2.0 truncation=1e-04: D= 53 (106 signal ops)  overlap=0.999983  P=0.151  err exact=+2.8e-05  err Trotter n=1=+6.2e-02
+ step     sharpness=3.0 truncation=1e-02: D= 56 (112 signal ops)  overlap=1.000000  P=0.157  err exact=+2.6e-08  err Trotter n=1=+3.7e-02
+ step     sharpness=3.0 truncation=1e-03: D= 68 (136 signal ops)  overlap=1.000000  P=0.157  err exact=+4.2e-09  err Trotter n=1=+5.2e-02
+ step     sharpness=3.0 truncation=1e-04: D= 79 (158 signal ops)  overlap=1.000000  P=0.157  err exact=+3.0e-09  err Trotter n=1=+9.0e-02
+ step     sharpness=4.0 truncation=1e-02: D= 74 (148 signal ops)  overlap=1.000000  P=0.158  err exact=+4.6e-08  err Trotter n=1=+8.2e-02
+ step     sharpness=4.0 truncation=1e-03: D= 91 (182 signal ops)  overlap=1.000000  P=0.158  err exact=+1.1e-10  err Trotter n=1=+3.8e-02
+ step     sharpness=4.0 truncation=1e-04: D=105 (210 signal ops)  overlap=1.000000  P=0.158  err exact=+6.6e-11  err Trotter n=1=+5.9e-02
+ [3 s]  -> results/
+========================================================================
+joshi
+========================================================================
+ 5x4 J=2: 51 qubits | two-qubit gates per step: this work 373 (native-ZZ basis 373), Joshi et al. 385 | two-qubit depth: this work 40, Joshi et al. 28
+ 4x3 J=0: 29 qubits | two-qubit gates per step: this work 119 (native-ZZ basis 119), Joshi et al. 119 | two-qubit depth: this work 26, Joshi et al. 28
+   (single-qubit counts are not compared: the native one-qubit gate sets differ)
+ 4x3 J=0.0: sector dim 1,826 (29 qubits), max particles 5.878, string intact at t=3.0: 0.878, time-averaged particles off the string 0.0825 (at distance >= 2: 0.0264) | Trotter dt=0.1 o1 F(t_max)=0.9867 | Trotter dt=0.1 o2 F(t_max)=0.9989  [1 s]
+ 5x4 J=0.0: sector dim 636,487 (51 qubits), max particles 7.846, string intact at t=3.0: 0.828, time-averaged particles off the string 0.1971 (at distance >= 2: 0.1037)  [117 s]
+ 5x4 J=2.0: sector dim 636,487 (51 qubits), max particles 5.077, string intact at t=3.0: 0.004, time-averaged particles off the string 1.0342 (at distance >= 2: 0.2500)  [138 s]
+ [258 s]  -> results/

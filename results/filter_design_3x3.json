@@ -1,0 +1,210 @@
+{
+ "environment": {
+  "python": "3.13.16",
+  "qiskit": "2.6.0",
+  "numpy": "2.5.3",
+  "scipy": "1.18.1"
+ },
+ "lattice": "3x3",
+ "J": 2.0,
+ "rows": [
+  {
+   "filter": "gaussian",
+   "sharpness": 2.0,
+   "truncation": 0.01,
+   "degree": 19,
+   "signal_operators": 38,
+   "overlap_exact": 0.9964862802839153,
+   "success_prob": 0.1582890499938089,
+   "error_exact": 0.005610347142186889,
+   "error_trotter_n1": 0.07292524926151511
+  },
+  {
+   "filter": "gaussian",
+   "sharpness": 2.0,
+   "truncation": 0.001,
+   "degree": 23,
+   "signal_operators": 46,
+   "overlap_exact": 0.9964929766373587,
+   "success_prob": 0.15828810934497842,
+   "error_exact": 0.005595434060873927,
+   "error_trotter_n1": 0.050498582960762484
+  },
+  {
+   "filter": "gaussian",
+   "sharpness": 2.0,
+   "truncation": 0.0001,
+   "degree": 27,
+   "signal_operators": 54,
+   "overlap_exact": 0.9965030180128139,
+   "success_prob": 0.15828652948875918,
+   "error_exact": 0.005579384347611516,
+   "error_trotter_n1": 0.0288010089706372
+  },
+  {
+   "filter": "gaussian",
+   "sharpness": 3.0,
+   "truncation": 0.01,
+   "degree": 28,
+   "signal_operators": 56,
+   "overlap_exact": 0.999996397268982,
+   "success_prob": 0.1577447866361718,
+   "error_exact": 8.610419069299269e-06,
+   "error_trotter_n1": 0.03262251096778357
+  },
+  {
+   "filter": "gaussian",
+   "sharpness": 3.0,
+   "truncation": 0.001,
+   "degree": 34,
+   "signal_operators": 68,
+   "overlap_exact": 0.9999951273161616,
+   "success_prob": 0.15772546378714117,
+   "error_exact": 7.795129426391156e-06,
+   "error_trotter_n1": 0.0342236032680443
+  },
+  {
+   "filter": "gaussian",
+   "sharpness": 3.0,
+   "truncation": 0.0001,
+   "degree": 40,
+   "signal_operators": 80,
+   "overlap_exact": 0.9999949108214814,
+   "success_prob": 0.1577255000729158,
+   "error_exact": 8.119848067700275e-06,
+   "error_trotter_n1": 0.04700476536280718
+  },
+  {
+   "filter": "gaussian",
+   "sharpness": 4.0,
+   "truncation": 0.01,
+   "degree": 37,
+   "signal_operators": 74,
+   "overlap_exact": 0.9999988385386213,
+   "success_prob": 0.15772560524846999,
+   "error_exact": 3.8909365791539585e-06,
+   "error_trotter_n1": 0.04070105043488503
+  },
+  {
+   "filter": "gaussian",
+   "sharpness": 4.0,
+   "truncation": 0.001,
+   "degree": 46,
+   "signal_operators": 92,
+   "overlap_exact": 0.9999999949548067,
+   "success_prob": 0.1577254564206747,
+   "error_exact": 2.2308090485978482e-08,
+   "error_trotter_n1": 0.048117483900412594
+  },
+  {
+   "filter": "gaussian",
+   "sharpness": 4.0,
+   "truncation": 0.0001,
+   "degree": 53,
+   "signal_operators": 106,
+   "overlap_exact": 0.9999999992874631,
+   "success_prob": 0.15772545892759643,
+   "error_exact": 1.267586924313946e-09,
+   "error_trotter_n1": 0.04472069427704373
+  },
+  {
+   "filter": "step",
+   "sharpness": 2.0,
+   "truncation": 0.01,
+   "degree": 37,
+   "signal_operators": 74,
+   "overlap_exact": 0.99998156778773,
+   "success_prob": 0.15053335803030218,
+   "error_exact": 2.9413728031002506e-05,
+   "error_trotter_n1": 0.06930234202969032
+  },
+  {
+   "filter": "step",
+   "sharpness": 2.0,
+   "truncation": 0.001,
+   "degree": 46,
+   "signal_operators": 92,
+   "overlap_exact": 0.999982795256747,
+   "success_prob": 0.15062126706350626,
+   "error_exact": 2.745030378736857e-05,
+   "error_trotter_n1": 0.07761863336541097
+  },
+  {
+   "filter": "step",
+   "sharpness": 2.0,
+   "truncation": 0.0001,
+   "degree": 53,
+   "signal_operators": 106,
+   "overlap_exact": 0.9999827505024765,
+   "success_prob": 0.15062749575428303,
+   "error_exact": 2.7521533344732063e-05,
+   "error_trotter_n1": 0.06182230441271397
+  },
+  {
+   "filter": "step",
+   "sharpness": 3.0,
+   "truncation": 0.01,
+   "degree": 56,
+   "signal_operators": 112,
+   "overlap_exact": 0.9999999919372686,
+   "success_prob": 0.15729058349186775,
+   "error_exact": 2.5511091905627836e-08,
+   "error_trotter_n1": 0.0365772527249435
+  },
+  {
+   "filter": "step",
+   "sharpness": 3.0,
+   "truncation": 0.001,
+   "degree": 68,
+   "signal_operators": 136,
+   "overlap_exact": 0.9999999973692163,
+   "success_prob": 0.15729504189329138,
+   "error_exact": 4.2094567831441054e-09,
+   "error_trotter_n1": 0.05181721357787694
+  },
+  {
+   "filter": "step",
+   "sharpness": 3.0,
+   "truncation": 0.0001,
+   "degree": 79,
+   "signal_operators": 158,
+   "overlap_exact": 0.9999999981425061,
+   "success_prob": 0.15729422165710144,
+   "error_exact": 3.0376492432537816e-09,
+   "error_trotter_n1": 0.08991222304799074
+  },
+  {
+   "filter": "step",
+   "sharpness": 4.0,
+   "truncation": 0.01,
+   "degree": 74,
+   "signal_operators": 148,
+   "overlap_exact": 0.999999981958634,
+   "success_prob": 0.1576431703329048,
+   "error_exact": 4.582115398221731e-08,
+   "error_trotter_n1": 0.08234360758073223
+  },
+  {
+   "filter": "step",
+   "sharpness": 4.0,
+   "truncation": 0.001,
+   "degree": 91,
+   "signal_operators": 182,
+   "overlap_exact": 0.9999999999372957,
+   "success_prob": 0.15770894748011918,
+   "error_exact": 1.1292300428067392e-10,
+   "error_trotter_n1": 0.03839292394895555
+  },
+  {
+   "filter": "step",
+   "sharpness": 4.0,
+   "truncation": 0.0001,
+   "degree": 105,
+   "signal_operators": 210,
+   "overlap_exact": 0.9999999999926635,
+   "success_prob": 0.15771142341769379,
+   "error_exact": 6.616485137556083e-11,
+   "error_trotter_n1": 0.058617853293617905
+  }
+ ]
+}
