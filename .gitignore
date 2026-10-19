@@ -1,5 +1,8 @@
 QFT/
 legacy/
 __pycache__/
+.pytest_cache/
 .DS_Store
 *.pyc
+*.olean
+casimir_explorer.png

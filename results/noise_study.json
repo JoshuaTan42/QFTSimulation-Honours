@@ -1,0 +1,166 @@
+{
+ "environment": {
+  "python": "3.13.16",
+  "qiskit": "2.6.0",
+  "numpy": "2.5.3",
+  "scipy": "1.18.1"
+ },
+ "studies": [
+  {
+   "lattice": "2x2",
+   "qubits": 7,
+   "cx_gates": 384,
+   "E0": -2.8284271247461903,
+   "gap": 2.8284271247461903,
+   "method": "trotter",
+   "n_steps": 1,
+   "trajectories": 400,
+   "rows": [
+    {
+     "p": 0.0,
+     "expected_errors": 0.0,
+     "energy_raw": -2.8142470509099033,
+     "energy_raw_err": 0.0,
+     "energy_gauge": -2.8142470509099033,
+     "energy_gauge_err": 0.0,
+     "accept_raw": 0.46148350900025614,
+     "accept_gauge": 0.46148350900025614,
+     "gauge_weight": 1.0
+    },
+    {
+     "p": 3e-05,
+     "expected_errors": 0.01152,
+     "energy_raw": -2.782484098892582,
+     "energy_raw_err": 0.017024123055794125,
+     "energy_gauge": -2.787359984755167,
+     "energy_gauge_err": 0.016232123934307237,
+     "accept_raw": 0.4597646226554852,
+     "accept_gauge": 0.45841016228480513,
+     "gauge_weight": 0.9970540135018283
+    },
+    {
+     "p": 0.0001,
+     "expected_errors": 0.038400000000000004,
+     "energy_raw": -2.7596826785304343,
+     "energy_raw_err": 0.021528651361021875,
+     "energy_gauge": -2.7888142925664026,
+     "energy_gauge_err": 0.015917365499206807,
+     "accept_raw": 0.4530018748051039,
+     "accept_gauge": 0.4481478538840735,
+     "gauge_weight": 0.9892847663751531
+    },
+    {
+     "p": 0.0003,
+     "expected_errors": 0.1152,
+     "energy_raw": -2.629378594825886,
+     "energy_raw_err": 0.03839516147599044,
+     "energy_gauge": -2.6983901458758126,
+     "energy_gauge_err": 0.03221852472784277,
+     "accept_raw": 0.4492341003032715,
+     "accept_gauge": 0.4365428340484349,
+     "gauge_weight": 0.9717491030928666
+    },
+    {
+     "p": 0.001,
+     "expected_errors": 0.384,
+     "energy_raw": -2.1166441299999663,
+     "energy_raw_err": 0.0725918004679943,
+     "energy_gauge": -2.3784536591464116,
+     "energy_gauge_err": 0.06925847854092321,
+     "accept_raw": 0.4172644407765484,
+     "accept_gauge": 0.36895347652376415,
+     "gauge_weight": 0.8842197907809366
+    },
+    {
+     "p": 0.003,
+     "expected_errors": 1.1520000000000001,
+     "energy_raw": -1.240959955771374,
+     "energy_raw_err": 0.09264369438621416,
+     "energy_gauge": -1.8558603796010804,
+     "energy_gauge_err": 0.11554719476450856,
+     "accept_raw": 0.3543040165799907,
+     "accept_gauge": 0.22916626525382403,
+     "gauge_weight": 0.6468068509804361
+    }
+   ]
+  },
+  {
+   "lattice": "2x3",
+   "qubits": 11,
+   "cx_gates": 2048,
+   "E0": -4.898979485566356,
+   "gap": 2.070552360820166,
+   "method": "trotter",
+   "n_steps": 1,
+   "trajectories": 400,
+   "rows": [
+    {
+     "p": 0.0,
+     "expected_errors": 0.0,
+     "energy_raw": -4.871572771539161,
+     "energy_raw_err": 0.0,
+     "energy_gauge": -4.871572771539161,
+     "energy_gauge_err": 0.0,
+     "accept_raw": 0.30350727301926606,
+     "accept_gauge": 0.30350727301926606,
+     "gauge_weight": 1.0
+    },
+    {
+     "p": 3e-05,
+     "expected_errors": 0.06144,
+     "energy_raw": -4.706734315622495,
+     "energy_raw_err": 0.056864505834560604,
+     "energy_gauge": -4.754230083246631,
+     "energy_gauge_err": 0.05266149262153691,
+     "accept_raw": 0.2989175973588694,
+     "accept_gauge": 0.29463816709389823,
+     "gauge_weight": 0.9856835786759203
+    },
+    {
+     "p": 0.0001,
+     "expected_errors": 0.2048,
+     "energy_raw": -4.271337108114079,
+     "energy_raw_err": 0.10946355174477754,
+     "energy_gauge": -4.503940392510701,
+     "energy_gauge_err": 0.09662283283824458,
+     "accept_raw": 0.289634098200223,
+     "accept_gauge": 0.2703487108762808,
+     "gauge_weight": 0.933414651645711
+    },
+    {
+     "p": 0.0003,
+     "expected_errors": 0.6144,
+     "energy_raw": -3.5849306272826866,
+     "energy_raw_err": 0.14614698042491794,
+     "energy_gauge": -4.2663146392153015,
+     "energy_gauge_err": 0.12900929725525354,
+     "accept_raw": 0.259486173458579,
+     "accept_gauge": 0.20898089607605994,
+     "gauge_weight": 0.805364283154836
+    },
+    {
+     "p": 0.001,
+     "expected_errors": 2.048,
+     "energy_raw": -1.294660099160562,
+     "energy_raw_err": 0.13713067647677143,
+     "energy_gauge": -2.6802190328926834,
+     "energy_gauge_err": 0.2594110046962682,
+     "accept_raw": 0.22326654870859072,
+     "accept_gauge": 0.08758818217970227,
+     "gauge_weight": 0.3923032029935799
+    },
+    {
+     "p": 0.003,
+     "expected_errors": 6.144,
+     "energy_raw": -0.08479629970038928,
+     "energy_raw_err": 0.0263708870981398,
+     "energy_gauge": -1.164523087972271,
+     "energy_gauge_err": 0.5321909711036658,
+     "accept_raw": 0.3117755535869552,
+     "accept_gauge": 0.011522001522277456,
+     "gauge_weight": 0.03695607750420988
+    }
+   ]
+  }
+ ]
+}

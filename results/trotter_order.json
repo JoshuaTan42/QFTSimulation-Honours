@@ -1,0 +1,121 @@
+{
+ "environment": {
+  "python": "3.13.16",
+  "qiskit": "2.6.0",
+  "numpy": "2.5.3",
+  "scipy": "1.18.1"
+ },
+ "J": 2.0,
+ "studies": [
+  {
+   "lattice": "2x3",
+   "E0": -4.898979485566356,
+   "orders": [
+    {
+     "order": 1,
+     "runs": [
+      {
+       "n": 1,
+       "error": 0.027406714027194745,
+       "two_qubit_gates": 2048
+      },
+      {
+       "n": 2,
+       "error": 0.005933607573425981,
+       "two_qubit_gates": 4096
+      },
+      {
+       "n": 4,
+       "error": 0.0014366326770387516,
+       "two_qubit_gates": 8192
+      },
+      {
+       "n": 8,
+       "error": 0.0003564115371954557,
+       "two_qubit_gates": 16384
+      }
+     ],
+     "richardson_error": -9.415712061411341e-05,
+     "richardson_gates": 30720
+    },
+    {
+     "order": 2,
+     "runs": [
+      {
+       "n": 1,
+       "error": 0.0006441174173685837,
+       "two_qubit_gates": 2784
+      },
+      {
+       "n": 2,
+       "error": 3.802064384217374e-05,
+       "two_qubit_gates": 5568
+      },
+      {
+       "n": 4,
+       "error": 2.3460720841583793e-06,
+       "two_qubit_gates": 11136
+      }
+     ],
+     "richardson_error": 7.52292310224334e-07,
+     "richardson_gates": 19488
+    }
+   ]
+  },
+  {
+   "lattice": "3x3",
+   "E0": -5.86704398328971,
+   "orders": [
+    {
+     "order": 1,
+     "runs": [
+      {
+       "n": 1,
+       "error": 0.0342236032680443,
+       "two_qubit_gates": 6528
+      },
+      {
+       "n": 2,
+       "error": 0.008569187910511644,
+       "two_qubit_gates": 13056
+      },
+      {
+       "n": 4,
+       "error": 0.0021658716300585468,
+       "two_qubit_gates": 26112
+      },
+      {
+       "n": 8,
+       "error": 0.0005582974765969695,
+       "two_qubit_gates": 52224
+      }
+     ],
+     "richardson_error": 8.916890385179954e-06,
+     "richardson_gates": 97920
+    },
+    {
+     "order": 2,
+     "runs": [
+      {
+       "n": 1,
+       "error": 0.00015229560568741363,
+       "two_qubit_gates": 9656
+      },
+      {
+       "n": 2,
+       "error": 1.5417427331243516e-05,
+       "two_qubit_gates": 19312
+      },
+      {
+       "n": 4,
+       "error": 7.943289264567e-06,
+       "two_qubit_gates": 38624
+      }
+     ],
+     "richardson_error": 7.82927937859057e-06,
+     "richardson_gates": 67592
+    }
+   ]
+  }
+ ]
+}

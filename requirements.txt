@@ -1,0 +1,8 @@
+numpy>=2.0
+scipy>=1.13
+matplotlib>=3.9
+qiskit>=2.0
+qiskit-aer>=0.15         # hardware.py: ideal and noisy (fake-device) sampling
+quimb>=1.10              # tensor_network.py: DMRG cross-check
+pytest>=8.0              # tests
+# optional: qiskit-ibm-runtime>=0.40 for fake:<device> snapshots and ibm:<device> runs
